@@ -34,4 +34,5 @@ google-services.json
 *.hprof
 
 #Claude
+.claude/
 CLAUDE.md
