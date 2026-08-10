@@ -1,5 +1,10 @@
 package com.project.helpcircle.di
 
+import com.project.helpcircle.data.repository.AgencyRepositoryImpl
+import com.project.helpcircle.data.repository.UserRepositoryImpl
+import com.project.helpcircle.domain.repository.AgencyRepository
+import com.project.helpcircle.domain.repository.UserRepository
+import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -7,4 +12,11 @@ import dagger.hilt.components.SingletonComponent
 /** Hilt module binding domain repository interfaces to their data-layer implementations. */
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class RepositoryModule
+abstract class RepositoryModule {
+
+    @Binds
+    abstract fun bindAgencyRepository(impl: AgencyRepositoryImpl): AgencyRepository
+
+    @Binds
+    abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
+}
