@@ -9,8 +9,12 @@ service cloud.firestore {
 
       // Only activeMembers/lastActivity are client-writable; IA_comm is set only server-side,
       // per the Mathematical Inflation guideline — clients must never self-report their score.
+      // inviteCode may only be set at creation (matching InviteCodeGenerator's shape) and is
+      // immutable afterward — the update rule below never includes it in its allowed keys.
       allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['activeMembers', 'lastActivity']);
+        && request.resource.data.keys().hasOnly(['activeMembers', 'lastActivity', 'inviteCode'])
+        && request.resource.data.inviteCode is string
+        && request.resource.data.inviteCode.matches('^[A-Z0-9]{6}$');
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeMembers', 'lastActivity']);
       allow delete: if false;

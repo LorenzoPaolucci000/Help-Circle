@@ -2,7 +2,8 @@ package com.project.helpcircle.presentation.community
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.project.helpcircle.domain.usecase.JoinCommunityUseCase
+import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
+import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,40 +13,75 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class JoinCommunityTab { JOIN, CREATE }
+
 data class JoinCommunityUiState(
-    val communityId: String = "",
+    val selectedTab: JoinCommunityTab = JoinCommunityTab.JOIN,
+    val inviteCodeInput: String = "",
     val isJoining: Boolean = false,
-    val errorMessage: String? = null,
+    val joinError: String? = null,
+    val isCreating: Boolean = false,
+    val createError: String? = null,
+    val createdInviteCode: String? = null,
     val hasJoined: Boolean = false
 )
 
 @HiltViewModel
 class JoinCommunityViewModel @Inject constructor(
-    private val joinCommunity: JoinCommunityUseCase
+    private val joinCommunityByInviteCode: JoinCommunityByInviteCodeUseCase,
+    private val createCommunity: CreateCommunityUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(JoinCommunityUiState())
     val uiState: StateFlow<JoinCommunityUiState> = _uiState.asStateFlow()
 
-    fun onCommunityIdChanged(communityId: String) {
-        _uiState.update { it.copy(communityId = communityId, errorMessage = null) }
+    fun onTabSelected(tab: JoinCommunityTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    fun onInviteCodeInputChanged(inviteCode: String) {
+        _uiState.update { it.copy(inviteCodeInput = inviteCode, joinError = null) }
     }
 
     fun onJoinClicked() {
-        val communityId = _uiState.value.communityId.trim()
-        if (communityId.isEmpty()) return
+        val inviteCode = _uiState.value.inviteCodeInput.trim()
+        if (inviteCode.isEmpty()) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isJoining = true, errorMessage = null) }
+            _uiState.update { it.copy(isJoining = true, joinError = null) }
             try {
-                joinCommunity(communityId)
-                _uiState.update { it.copy(isJoining = false, hasJoined = true) }
+                val joined = joinCommunityByInviteCode(inviteCode)
+                if (joined != null) {
+                    _uiState.update { it.copy(isJoining = false, hasJoined = true) }
+                } else {
+                    _uiState.update { it.copy(isJoining = false, joinError = "Code not found") }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isJoining = false, errorMessage = "Couldn't join that circle. Check the code and try again.")
+                    it.copy(isJoining = false, joinError = "Couldn't join that circle. Try again.")
                 }
             }
         }
+    }
+
+    fun onCreateClicked() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreating = true, createError = null) }
+            try {
+                val state = createCommunity()
+                _uiState.update { it.copy(isCreating = false, createdInviteCode = state.inviteCode) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isCreating = false, createError = "Couldn't create a circle. Try again.")
+                }
+            }
+        }
+    }
+
+    fun onContinueAfterCreateClicked() {
+        _uiState.update { it.copy(hasJoined = true) }
     }
 }

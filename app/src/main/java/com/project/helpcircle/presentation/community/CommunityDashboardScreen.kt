@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,16 +70,31 @@ private fun CommunityDashboardContent(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            else -> Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                CollectiveIndexDisplay(collectiveIndex = uiState.collectiveIndex)
-                Spacer(modifier = Modifier.height(40.dp))
-                MemberStatusRow(members = uiState.members)
+            else -> Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.isSolo) {
+                    SoloModeBanner(
+                        inviteCode = uiState.inviteCode,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CollectiveIndexDisplay(collectiveIndex = if (uiState.isSolo) null else uiState.collectiveIndex)
+                    Spacer(modifier = Modifier.height(40.dp))
+                    if (uiState.isSolo) {
+                        EmptyPeersState()
+                    } else {
+                        MemberStatusRow(members = uiState.members)
+                    }
+                }
             }
         }
     }
@@ -103,15 +121,15 @@ private fun landscapeColors(landscape: VisualLandscape): Pair<Color, Color> = wh
     VisualLandscape.BLOOMING_MEADOW -> Color(0xFFAED581) to Color(0xFF66BB6A)
 }
 
-/** Large, central IA_comm score. */
+/** Large, central IA_comm score; shows "--" when solo, since one member has nothing to average. */
 @Composable
-private fun CollectiveIndexDisplay(collectiveIndex: Int, modifier: Modifier = Modifier) {
+private fun CollectiveIndexDisplay(collectiveIndex: Int?, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = collectiveIndex.toString(),
+            text = collectiveIndex?.toString() ?: "--",
             fontSize = 96.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White
@@ -122,6 +140,49 @@ private fun CollectiveIndexDisplay(collectiveIndex: Int, modifier: Modifier = Mo
             color = Color.White.copy(alpha = 0.85f)
         )
     }
+}
+
+/** Shown in place of the score/roster while this device is the community's only member. */
+@Composable
+private fun SoloModeBanner(inviteCode: String, modifier: Modifier = Modifier) {
+    val clipboardManager = LocalClipboardManager.current
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Invite friends to unlock peer support",
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = inviteCode,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(inviteCode)) }) {
+                Text("Copy code")
+            }
+        }
+    }
+}
+
+/** Peer-roster empty state: shown instead of [MemberStatusRow] while the circle has no other members. */
+@Composable
+private fun EmptyPeersState(modifier: Modifier = Modifier) {
+    Text(
+        text = "No peers yet. Share your invite code to grow your circle.",
+        modifier = modifier.padding(horizontal = 24.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.White.copy(alpha = 0.85f),
+        textAlign = TextAlign.Center
+    )
 }
 
 /** Peer roster: pseudonym and coarse status per member, this community's whole "safe place" identity. */
