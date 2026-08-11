@@ -76,38 +76,41 @@ class HelpCircleNotificationManager @Inject constructor(
             .build()
 
     fun postTextNudgeNotification(message: String) {
-        val notificationId = nextNudgeNotificationId.incrementAndGet()
-        systemNotificationManager.notify(
-            notificationId,
-            NotificationCompat.Builder(context, NUDGE_CHANNEL_ID)
-                .setContentTitle(context.getString(R.string.text_nudge_title))
-                .setContentText(message)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .addAction(recoveryAction(notificationId))
-                .build()
-        )
+        postNudgeNotification(context.getString(R.string.text_nudge_title), message)
     }
 
     fun postHapticNudgeNotification() {
-        val notificationId = nextNudgeNotificationId.incrementAndGet()
-        systemNotificationManager.notify(
-            notificationId,
-            NotificationCompat.Builder(context, NUDGE_CHANNEL_ID)
-                .setContentTitle(context.getString(R.string.haptic_nudge_title))
-                .setContentText(context.getString(R.string.haptic_nudge_text))
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .addAction(recoveryAction(notificationId))
-                .build()
+        postNudgeNotification(
+            context.getString(R.string.haptic_nudge_title),
+            context.getString(R.string.haptic_nudge_text)
+        )
+    }
+
+    fun postGrayscaleFallbackNotification() {
+        postNudgeNotification(
+            context.getString(R.string.grayscale_nudge_title),
+            context.getString(R.string.grayscale_nudge_text)
         )
     }
 
     fun fireHapticPattern() {
         vibrator.vibrate(VibrationEffect.createWaveform(SOS_PATTERN_MILLIS, NO_REPEAT))
+    }
+
+    private fun postNudgeNotification(title: String, text: String) {
+        val notificationId = nextNudgeNotificationId.incrementAndGet()
+        systemNotificationManager.notify(
+            notificationId,
+            NotificationCompat.Builder(context, NUDGE_CHANNEL_ID)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .addAction(recoveryAction(notificationId))
+                .build()
+        )
     }
 
     private fun recoveryAction(notificationId: Int): NotificationCompat.Action {

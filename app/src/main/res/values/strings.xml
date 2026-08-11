@@ -11,4 +11,6 @@
     <string name="haptic_nudge_title">Your circle reached out</string>
     <string name="haptic_nudge_text">Someone sent you a haptic nudge.</string>
     <string name="recovery_action_label">I\'m back</string>
+    <string name="grayscale_nudge_title">Your circle reached out</string>
+    <string name="grayscale_nudge_text">Someone sent you a grey-scale nudge, but this device can\'t dim the screen right now.</string>
 </resources>

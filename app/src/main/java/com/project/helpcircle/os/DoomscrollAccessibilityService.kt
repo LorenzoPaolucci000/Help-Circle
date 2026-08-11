@@ -39,6 +39,9 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var notificationManager: HelpCircleNotificationManager
 
+    @Inject
+    lateinit var grayscaleInterventionController: GrayscaleInterventionController
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onServiceConnected() {
@@ -59,8 +62,8 @@ class DoomscrollAccessibilityService : AccessibilityService() {
                 notificationManager.fireHapticPattern()
                 notificationManager.postHapticNudgeNotification()
             }
-            // MVP_STUB: grayscale and content-blur interventions are wired in later steps.
-            is Nudge.GreyscaleLevel -> Unit
+            is Nudge.GreyscaleLevel -> grayscaleInterventionController.apply(nudge.level)
+            // MVP_STUB: content-blur intervention is wired in a later step.
             Nudge.ContentBlur -> Unit
         }
     }
