@@ -7,4 +7,8 @@
     <string name="monitoring_notification_text">HelpCircle is watching over you</string>
     <string name="nudge_channel_name">Nudges from your circle</string>
     <string name="nudge_channel_description">Alerts you when a community member sends you an intervention.</string>
+    <string name="text_nudge_title">A message from your circle</string>
+    <string name="haptic_nudge_title">Your circle reached out</string>
+    <string name="haptic_nudge_text">Someone sent you a haptic nudge.</string>
+    <string name="recovery_action_label">I\'m back</string>
 </resources>
