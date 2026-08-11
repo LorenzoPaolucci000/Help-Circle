@@ -8,4 +8,8 @@ interface CommunityRepository {
     fun observeCommunityState(communityId: String): Flow<CommunityState>
     suspend fun joinCommunity(communityId: String): CommunityState
     suspend fun reportCrisis(communityId: String)
+    suspend fun reportRecovery(communityId: String)
+
+    /** The community this device last joined, or null if it has never joined one. */
+    suspend fun getActiveCommunityId(): String?
 }

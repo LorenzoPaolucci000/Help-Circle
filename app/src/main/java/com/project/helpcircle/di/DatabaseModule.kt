@@ -3,6 +3,7 @@ package com.project.helpcircle.di
 import android.content.Context
 import com.project.helpcircle.data.local.AppDatabase
 import com.project.helpcircle.data.local.SqlCipherPassphraseProvider
+import com.project.helpcircle.data.local.dao.ActiveCommunityDao
 import com.project.helpcircle.data.local.dao.AgencyStateDao
 import com.project.helpcircle.data.local.dao.ChargeWalletDao
 import com.project.helpcircle.data.local.dao.FocusSessionDao
@@ -37,4 +38,7 @@ object DatabaseModule {
 
     @Provides
     fun provideAgencyStateDao(database: AppDatabase): AgencyStateDao = database.agencyStateDao()
+
+    @Provides
+    fun provideActiveCommunityDao(database: AppDatabase): ActiveCommunityDao = database.activeCommunityDao()
 }

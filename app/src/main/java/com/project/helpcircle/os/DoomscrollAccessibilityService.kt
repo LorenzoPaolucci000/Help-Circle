@@ -19,6 +19,10 @@ import kotlinx.coroutines.launch
  * out this app's own UI — so raw usage data never leaves this boundary, per the Zero-PII rule.
  * Event coalescing is left to the framework's `notificationTimeout` (see the service's
  * accessibility config) rather than custom throttling here.
+ *
+ * Runs itself as a foreground service with a silent, persistent notification so aggressive OEM
+ * battery managers are less likely to kill it while it's the only thing keeping the doomscroll
+ * detector alive.
  */
 @AndroidEntryPoint
 class DoomscrollAccessibilityService : AccessibilityService() {
@@ -26,7 +30,18 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var detectLossOfAgencyUseCase: DetectLossOfAgencyUseCase
 
+    @Inject
+    lateinit var notificationManager: HelpCircleNotificationManager
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        startForeground(
+            HelpCircleNotificationManager.MONITORING_NOTIFICATION_ID,
+            notificationManager.buildMonitoringNotification()
+        )
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.packageName == packageName) return

@@ -4,6 +4,8 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.project.helpcircle.data.local.dao.ActiveCommunityDao
+import com.project.helpcircle.data.local.entity.ActiveCommunityEntity
 import com.project.helpcircle.domain.model.AgencyIndex
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.repository.CommunityRepository
@@ -25,10 +27,14 @@ import kotlinx.coroutines.tasks.await
  * is torn down when the collecting coroutine is cancelled, so a lifecycle-aware collector (e.g.
  * a future ViewModel using `repeatOnLifecycle(STARTED)`) naturally suspends it while the app is
  * backgrounded, addressing Doze/battery constraint at the presentation layer.
+ *
+ * Which community this device belongs to is tracked only locally, in [activeCommunityDao] — the
+ * community ID itself isn't sensitive, but nothing about it needs to be readable from Firestore.
  */
 class CommunityRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val activeCommunityDao: ActiveCommunityDao
 ) : CommunityRepository {
 
     override fun observeCommunityState(communityId: String): Flow<CommunityState> = callbackFlow {
@@ -51,21 +57,33 @@ class CommunityRepositoryImpl @Inject constructor(
             ),
             SetOptions.merge()
         ).await()
+        activeCommunityDao.upsert(ActiveCommunityEntity(communityId = communityId))
         return doc.get().await().toCommunityState(communityId)
     }
 
     override suspend fun reportCrisis(communityId: String) {
+        writeEvent(communityId, EVENT_TYPE_CRISIS_ALERT)
+        // MVP_STUB: recomputing IA_comm from crisis/nudge events and refreshing the community
+        // document's activeMembers/lastActivity presence is deferred to a later step.
+    }
+
+    override suspend fun reportRecovery(communityId: String) {
+        writeEvent(communityId, EVENT_TYPE_RECOVERY_REPORTED)
+        // MVP_STUB: recomputing IA_comm/IA_ind from a recovery event is deferred to a later step.
+    }
+
+    override suspend fun getActiveCommunityId(): String? = activeCommunityDao.get()?.communityId
+
+    private suspend fun writeEvent(communityId: String, type: String) {
         val senderId = userRepository.getOrCreateIdentity().anonymousHash
         communityDoc(communityId).collection(EVENTS_COLLECTION).add(
             mapOf(
-                FIELD_TYPE to EVENT_TYPE_CRISIS_ALERT,
+                FIELD_TYPE to type,
                 FIELD_COMMUNITY_ID to communityId,
                 FIELD_SENDER_ID to senderId,
                 FIELD_TIMESTAMP to FieldValue.serverTimestamp()
             )
         ).await()
-        // MVP_STUB: recomputing IA_comm from crisis/nudge events and refreshing the community
-        // document's activeMembers/lastActivity presence is deferred to a later step.
     }
 
     private fun communityDoc(communityId: String) =
@@ -89,6 +107,7 @@ class CommunityRepositoryImpl @Inject constructor(
         private const val COMMUNITIES_COLLECTION = "communities"
         private const val EVENTS_COLLECTION = "events"
         private const val EVENT_TYPE_CRISIS_ALERT = "crisis_alert"
+        private const val EVENT_TYPE_RECOVERY_REPORTED = "recovery_reported"
         private const val FIELD_ACTIVE_MEMBERS = "activeMembers"
         private const val FIELD_IA_COMM = "IA_comm"
         private const val FIELD_LAST_ACTIVITY = "lastActivity"

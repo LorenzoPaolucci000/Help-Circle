@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.project.helpcircle.data.local.dao.ActiveCommunityDao
 import com.project.helpcircle.data.local.dao.AgencyStateDao
 import com.project.helpcircle.data.local.dao.ChargeWalletDao
 import com.project.helpcircle.data.local.dao.FocusSessionDao
 import com.project.helpcircle.data.local.dao.UserIdentityDao
+import com.project.helpcircle.data.local.entity.ActiveCommunityEntity
 import com.project.helpcircle.data.local.entity.AgencyStateEntity
 import com.project.helpcircle.data.local.entity.ChargeWalletEntity
 import com.project.helpcircle.data.local.entity.FocusSessionEntity
@@ -20,9 +22,10 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         FocusSessionEntity::class,
         ChargeWalletEntity::class,
         UserIdentityEntity::class,
-        AgencyStateEntity::class
+        AgencyStateEntity::class,
+        ActiveCommunityEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chargeWalletDao(): ChargeWalletDao
     abstract fun userIdentityDao(): UserIdentityDao
     abstract fun agencyStateDao(): AgencyStateDao
+    abstract fun activeCommunityDao(): ActiveCommunityDao
 
     companion object {
         private const val DATABASE_NAME = "help_circle.db"
@@ -37,6 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun build(context: Context, passphrase: ByteArray): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }
 }
