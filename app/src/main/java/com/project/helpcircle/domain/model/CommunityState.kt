@@ -5,7 +5,8 @@ data class CommunityState(
     val communityId: String,
     val memberAgencyIndices: List<AgencyIndex>,
     val cohesionBonusApplied: Boolean,
-    val members: List<CommunityMember> = emptyList()
+    val members: List<CommunityMember> = emptyList(),
+    val inviteCode: String = ""
 ) {
     val collectiveIndex: AgencyIndex
         get() {

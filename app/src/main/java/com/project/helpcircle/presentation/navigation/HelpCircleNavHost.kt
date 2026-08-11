@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.community.CommunityDashboardScreen
+import com.project.helpcircle.presentation.community.JoinCommunityScreen
 import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
 
 @Composable
@@ -22,8 +23,17 @@ fun HelpCircleNavHost(
         composable(Destination.NicknameSetup.route) {
             NicknameSetupScreen(
                 onNicknameSaved = {
-                    navController.navigate(Destination.CommunityDashboard.route) {
+                    navController.navigate(Destination.JoinCommunity.route) {
                         popUpTo(Destination.NicknameSetup.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(Destination.JoinCommunity.route) {
+            JoinCommunityScreen(
+                onJoined = {
+                    navController.navigate(Destination.CommunityDashboard.route) {
+                        popUpTo(Destination.JoinCommunity.route) { inclusive = true }
                     }
                 }
             )

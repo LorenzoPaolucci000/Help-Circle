@@ -38,6 +38,12 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         private const val DATABASE_NAME = "help_circle.db"
 
+        init {
+            // net.zetetic:sqlcipher-android bundles libsqlcipher.so but never loads it itself;
+            // without this, SupportOpenHelperFactory's native calls fail with UnsatisfiedLinkError.
+            System.loadLibrary("sqlcipher")
+        }
+
         fun build(context: Context, passphrase: ByteArray): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))

@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /communities/{communityId} {
+      // The IA_comm aggregate and member roster are visible to any signed-in (anonymous) user.
+      allow read: if request.auth != null;
+
+      // Only activeMembers/lastActivity are client-writable; IA_comm is set only server-side,
+      // per the Mathematical Inflation guideline — clients must never self-report their score.
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['activeMembers', 'lastActivity']);
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeMembers', 'lastActivity']);
+      allow delete: if false;
+
+      match /members/{memberId} {
+        // Readable only by fellow members of this same community (callers who already have
+        // their own roster entry here) — never by the public at large.
+        allow read: if request.auth != null
+          && exists(/databases/$(database)/documents/communities/$(communityId)/members/$(request.auth.uid));
+
+        // A member may only ever write their own entry, and only nickname/status/lastSeen —
+        // never anything else, per the Zero-PII rule.
+        allow write: if request.auth != null
+          && request.auth.uid == memberId
+          && request.resource.data.keys().hasOnly(['nickname', 'status', 'lastSeen'])
+          && request.resource.data.nickname is string
+          && request.resource.data.nickname.size() <= 20
+          && request.resource.data.status in ['ok', 'at_risk', 'crisis'];
+      }
+
+      match /events/{eventId} {
+        // Events are append-only and always self-attributed; never directly readable, updatable
+        // or deletable — incoming nudges are read only via the collection-group rule below.
+        allow create: if request.auth != null
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.communityId == communityId
+          && request.resource.data.type in ['crisis_alert', 'recovery_reported', 'nudge_sent'];
+        allow read, update, delete: if false;
+      }
+    }
+
+    // NudgeRepositoryImpl.incomingNudges runs a collectionGroup("events") query across every
+    // community; this is the rule Firestore checks for that query shape (distinct from the
+    // nested /communities/{id}/events rule above, which only governs the direct-path create).
+    // Only nudge_sent events addressed to the caller are ever readable this way.
+    match /{path=**}/events/{eventId} {
+      allow read: if request.auth != null
+        && resource.data.type == 'nudge_sent'
+        && resource.data.targetId == request.auth.uid;
+    }
+  }
+}

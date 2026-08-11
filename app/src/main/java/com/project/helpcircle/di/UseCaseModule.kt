@@ -5,6 +5,7 @@ import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
+import com.project.helpcircle.domain.usecase.JoinCommunityUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.ValidateNicknameUseCase
@@ -41,4 +42,9 @@ object UseCaseModule {
 
     @Provides
     fun provideValidateNicknameUseCase(): ValidateNicknameUseCase = ValidateNicknameUseCase()
+
+    @Provides
+    fun provideJoinCommunityUseCase(
+        communityRepository: CommunityRepository
+    ): JoinCommunityUseCase = JoinCommunityUseCase(communityRepository)
 }
