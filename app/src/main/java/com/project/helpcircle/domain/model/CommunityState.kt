@@ -4,7 +4,8 @@ package com.project.helpcircle.domain.model
 data class CommunityState(
     val communityId: String,
     val memberAgencyIndices: List<AgencyIndex>,
-    val cohesionBonusApplied: Boolean
+    val cohesionBonusApplied: Boolean,
+    val members: List<CommunityMember> = emptyList()
 ) {
     val collectiveIndex: AgencyIndex
         get() {
