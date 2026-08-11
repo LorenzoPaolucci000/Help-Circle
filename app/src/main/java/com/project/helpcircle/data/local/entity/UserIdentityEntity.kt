@@ -7,7 +7,8 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "user_identity")
 data class UserIdentityEntity(
     @PrimaryKey val id: Int = SINGLETON_ID,
-    val anonymousHash: String
+    val anonymousHash: String,
+    val nickname: String = ""
 ) {
     companion object {
         const val SINGLETON_ID = 0

@@ -28,12 +28,17 @@ class UserRepositoryImpl @Inject constructor(
 ) : UserRepository {
 
     override suspend fun getOrCreateIdentity(): UserIdentity {
-        userIdentityDao.get()?.let { return UserIdentity(it.anonymousHash) }
+        userIdentityDao.get()?.let { return UserIdentity(it.anonymousHash, it.nickname) }
         val uid = firebaseAuth.currentUser?.uid
             ?: firebaseAuth.signInAnonymously().await().user!!.uid
         val identity = UserIdentity(uid)
         userIdentityDao.insert(UserIdentityEntity(anonymousHash = identity.anonymousHash))
         return identity
+    }
+
+    override suspend fun saveNickname(nickname: String) {
+        val identity = getOrCreateIdentity()
+        userIdentityDao.insert(UserIdentityEntity(anonymousHash = identity.anonymousHash, nickname = nickname))
     }
 
     override val chargeWallet: Flow<ChargeWallet> = chargeWalletDao.observe()
