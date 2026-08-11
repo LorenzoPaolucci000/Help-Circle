@@ -62,6 +62,32 @@ class CommunityRepositoryImpl @Inject constructor(
         return doc.get().await().toCommunityState(communityId, members)
     }
 
+    override suspend fun createCommunity(inviteCode: String): CommunityState {
+        val doc = firestore.collection(COMMUNITIES_COLLECTION).document()
+        doc.set(
+            mapOf(
+                FIELD_INVITE_CODE to inviteCode,
+                FIELD_ACTIVE_MEMBERS to FieldValue.increment(1),
+                FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
+            )
+        ).await()
+        activeCommunityDao.upsert(ActiveCommunityEntity(communityId = doc.id))
+        writeOwnMemberDoc(doc.id, MemberStatus.OK)
+        val members = doc.collection(MEMBERS_COLLECTION).get().await().documents.map { it.toCommunityMember() }
+        return doc.get().await().toCommunityState(doc.id, members)
+    }
+
+    override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? {
+        val match = firestore.collection(COMMUNITIES_COLLECTION)
+            .whereEqualTo(FIELD_INVITE_CODE, inviteCode)
+            .limit(1)
+            .get()
+            .await()
+            .documents
+            .firstOrNull() ?: return null
+        return joinCommunity(match.id)
+    }
+
     override suspend fun reportCrisis(communityId: String) {
         writeEvent(communityId, EVENT_TYPE_CRISIS_ALERT)
         writeOwnMemberDoc(communityId, MemberStatus.CRISIS)
