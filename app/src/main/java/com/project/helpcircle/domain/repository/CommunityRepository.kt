@@ -12,4 +12,7 @@ interface CommunityRepository {
 
     /** The community this device last joined, or null if it has never joined one. */
     suspend fun getActiveCommunityId(): String?
+
+    /** How many members are currently in the given community. */
+    suspend fun getMemberCount(communityId: String): Int
 }

@@ -77,6 +77,9 @@ class CommunityRepositoryImpl @Inject constructor(
 
     override suspend fun getActiveCommunityId(): String? = activeCommunityDao.get()?.communityId
 
+    override suspend fun getMemberCount(communityId: String): Int =
+        communityDoc(communityId).collection(MEMBERS_COLLECTION).get().await().size()
+
     private fun observeCommunityDoc(communityId: String): Flow<DocumentSnapshot> = callbackFlow {
         val registration = communityDoc(communityId).addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -142,7 +145,8 @@ class CommunityRepositoryImpl @Inject constructor(
             communityId = communityId,
             memberAgencyIndices = List(activeMembers) { iaComm },
             cohesionBonusApplied = false,
-            members = members
+            members = members,
+            inviteCode = getString(FIELD_INVITE_CODE).orEmpty()
         )
     }
 
@@ -180,5 +184,6 @@ class CommunityRepositoryImpl @Inject constructor(
         private const val FIELD_NICKNAME = "nickname"
         private const val FIELD_STATUS = "status"
         private const val FIELD_LAST_SEEN = "lastSeen"
+        private const val FIELD_INVITE_CODE = "inviteCode"
     }
 }
