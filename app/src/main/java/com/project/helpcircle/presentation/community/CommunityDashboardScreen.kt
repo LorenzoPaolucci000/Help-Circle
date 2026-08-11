@@ -33,7 +33,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.project.helpcircle.domain.model.AgencyIndex
+import com.project.helpcircle.domain.model.CommunityMember
+import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.VisualLandscape
 
 /** Entry point: hoists [CommunityDashboardViewModel] state and hands it to the stateless content below. */
@@ -75,7 +76,7 @@ private fun CommunityDashboardContent(
             ) {
                 CollectiveIndexDisplay(collectiveIndex = uiState.collectiveIndex)
                 Spacer(modifier = Modifier.height(40.dp))
-                MemberStatusRow(memberIndices = uiState.memberIndices)
+                MemberStatusRow(members = uiState.members)
             }
         }
     }
@@ -123,23 +124,20 @@ private fun CollectiveIndexDisplay(collectiveIndex: Int, modifier: Modifier = Mo
     }
 }
 
-/** Anonymous per-member status cards: agency values only, no names or member identifiers. */
+/** Peer roster: pseudonym and coarse status per member, this community's whole "safe place" identity. */
 @Composable
-private fun MemberStatusRow(memberIndices: List<Int>, modifier: Modifier = Modifier) {
+private fun MemberStatusRow(members: List<CommunityMember>, modifier: Modifier = Modifier) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(horizontal = 8.dp)
     ) {
-        items(memberIndices) { index -> MemberStatusCard(agencyValue = index) }
+        items(members, key = { it.anonymousId }) { member -> MemberStatusCard(member = member) }
     }
 }
 
 @Composable
-private fun MemberStatusCard(agencyValue: Int, modifier: Modifier = Modifier) {
-    val landscape = VisualLandscape.forIndex(AgencyIndex.of(agencyValue))
-    val (dotColor, _) = landscapeColors(landscape)
-
+private fun MemberStatusCard(member: CommunityMember, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
@@ -153,10 +151,20 @@ private fun MemberStatusCard(agencyValue: Int, modifier: Modifier = Modifier) {
                     .height(12.dp)
                     .fillMaxWidth()
                     .clip(CircleShape)
-                    .background(dotColor)
+                    .background(statusColor(member.status))
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Peer", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = member.nickname.ifBlank { "Anonymous" },
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
+}
+
+private fun statusColor(status: MemberStatus): Color = when (status) {
+    MemberStatus.OK -> Color(0xFF66BB6A)
+    MemberStatus.AT_RISK -> Color(0xFFFFB74D)
+    MemberStatus.CRISIS -> Color(0xFFE57373)
 }

@@ -2,6 +2,7 @@ package com.project.helpcircle.presentation.community
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.VisualLandscape
 import com.project.helpcircle.domain.repository.CommunityRepository
@@ -17,13 +18,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** UI state for [CommunityDashboardScreen]; carries no member identities, only anonymous agency values. */
+/** UI state for [CommunityDashboardScreen]; each member carries only a pseudonym and coarse status, never PII or a raw IA_ind score. */
 data class CommunityDashboardUiState(
     val isLoading: Boolean = true,
     val hasActiveCommunity: Boolean = true,
     val collectiveIndex: Int = 50,
     val visualLandscape: VisualLandscape = VisualLandscape.OVERCAST,
-    val memberIndices: List<Int> = emptyList(),
+    val members: List<CommunityMember> = emptyList(),
     val latestNudge: Nudge? = null
 )
 
@@ -52,7 +53,7 @@ class CommunityDashboardViewModel @Inject constructor(
                             hasActiveCommunity = true,
                             collectiveIndex = state.collectiveIndex.value,
                             visualLandscape = state.visualLandscape,
-                            memberIndices = state.memberAgencyIndices.map { index -> index.value }
+                            members = state.members
                         )
                     }
                 }

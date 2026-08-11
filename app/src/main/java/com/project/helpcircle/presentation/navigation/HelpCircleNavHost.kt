@@ -1,0 +1,35 @@
+package com.project.helpcircle.presentation.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.project.helpcircle.presentation.community.CommunityDashboardScreen
+import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
+
+@Composable
+fun HelpCircleNavHost(
+    modifier: Modifier = Modifier,
+    navController: NavHostController = rememberNavController()
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Destination.NicknameSetup.route,
+        modifier = modifier
+    ) {
+        composable(Destination.NicknameSetup.route) {
+            NicknameSetupScreen(
+                onNicknameSaved = {
+                    navController.navigate(Destination.CommunityDashboard.route) {
+                        popUpTo(Destination.NicknameSetup.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(Destination.CommunityDashboard.route) {
+            CommunityDashboardScreen()
+        }
+    }
+}
