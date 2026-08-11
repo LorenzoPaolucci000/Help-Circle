@@ -93,6 +93,13 @@ class HelpCircleNotificationManager @Inject constructor(
         )
     }
 
+    fun postContentBlurFallbackNotification() {
+        postNudgeNotification(
+            context.getString(R.string.content_blur_nudge_title),
+            context.getString(R.string.content_blur_nudge_text)
+        )
+    }
+
     fun fireHapticPattern() {
         vibrator.vibrate(VibrationEffect.createWaveform(SOS_PATTERN_MILLIS, NO_REPEAT))
     }

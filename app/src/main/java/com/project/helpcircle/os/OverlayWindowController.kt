@@ -2,6 +2,7 @@ package com.project.helpcircle.os
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.os.Build
 import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
@@ -28,17 +29,27 @@ class OverlayWindowController @Inject constructor(
 
     fun canDrawOverlays(): Boolean = Settings.canDrawOverlays(context)
 
-    /** Shows [view] full-screen, replacing any overlay already shown. Returns false if not permitted or if adding the view fails. */
-    fun show(view: View): Boolean {
+    /**
+     * Shows [view] full-screen, replacing any overlay already shown. Returns false if not
+     * permitted or if adding the view fails. When [blurBehindRadius] is positive and the device
+     * is running Android 12+, the window compositor blurs whatever is behind the overlay
+     * (`FLAG_BLUR_BEHIND`); below that API level the flag/field don't exist, so [view] itself
+     * must carry a fallback visual (e.g. an opaque scrim background).
+     */
+    fun show(view: View, blurBehindRadius: Int = 0): Boolean {
         if (!canDrawOverlays()) return false
         dismiss()
+        val useBlurBehind = blurBehindRadius > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (useBlurBehind) flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            flags,
             PixelFormat.TRANSLUCENT
         )
+        if (useBlurBehind) params.blurBehindRadius = blurBehindRadius
         return runCatching { windowManager.addView(view, params) }
             .onSuccess { overlayView = view }
             .isSuccess
