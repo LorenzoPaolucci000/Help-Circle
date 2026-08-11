@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">HelpCircle</string>
+    <string name="accessibility_service_label">Help Circle scroll monitor</string>
+    <string name="accessibility_service_description">Watches the timing of scroll and tap gestures on-device to detect doomscrolling patterns. It never reads screen content, and nothing it observes leaves the device.</string>
 </resources>
