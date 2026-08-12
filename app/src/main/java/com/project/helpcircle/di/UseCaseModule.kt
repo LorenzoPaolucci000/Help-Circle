@@ -2,6 +2,7 @@ package com.project.helpcircle.di
 
 import com.project.helpcircle.domain.engine.AgencyDetectionEngine
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
+import com.project.helpcircle.domain.engine.ForegroundAppTracker
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.InstalledAppsRepository
@@ -37,6 +38,10 @@ object UseCaseModule {
     @Provides
     @Singleton
     fun provideCrisisEpisodeTracker(): CrisisEpisodeTracker = CrisisEpisodeTracker()
+
+    @Provides
+    @Singleton
+    fun provideForegroundAppTracker(): ForegroundAppTracker = ForegroundAppTracker()
 
     @Provides
     fun provideCalculateAgencyIndexUseCase(
