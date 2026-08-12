@@ -9,6 +9,8 @@ import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.community.CommunityDashboardScreen
 import com.project.helpcircle.presentation.community.JoinCommunityScreen
 import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
+import com.project.helpcircle.presentation.startup.StartupDestination
+import com.project.helpcircle.presentation.startup.StartupScreen
 
 @Composable
 fun HelpCircleNavHost(
@@ -17,9 +19,23 @@ fun HelpCircleNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Destination.NicknameSetup.route,
+        startDestination = Destination.Startup.route,
         modifier = modifier
     ) {
+        composable(Destination.Startup.route) {
+            StartupScreen(
+                onDestinationResolved = { destination ->
+                    val route = when (destination) {
+                        StartupDestination.NICKNAME_SETUP -> Destination.NicknameSetup.route
+                        StartupDestination.JOIN_COMMUNITY -> Destination.JoinCommunity.route
+                        StartupDestination.COMMUNITY_DASHBOARD -> Destination.CommunityDashboard.route
+                    }
+                    navController.navigate(route) {
+                        popUpTo(Destination.Startup.route) { inclusive = true }
+                    }
+                }
+            )
+        }
         composable(Destination.NicknameSetup.route) {
             NicknameSetupScreen(
                 onNicknameSaved = {
