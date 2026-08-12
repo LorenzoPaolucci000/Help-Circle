@@ -13,4 +13,10 @@ interface AgencyRepository {
     suspend fun recordFocusSession(session: FocusSession)
     suspend fun updateAgencyIndex(index: AgencyIndex)
     suspend fun reportAgencyState(state: AgencyState)
+
+    /**
+     * Adds [deltaAutonomy]/[deltaSupport] to the running Delta_Autonomy/Delta_Support totals,
+     * recomputes IA_ind from the baseline formula, persists both, and returns the new index.
+     */
+    suspend fun adjustAgencyDeltas(deltaAutonomy: Int = 0, deltaSupport: Int = 0): AgencyIndex
 }
