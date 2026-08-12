@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.provider.Settings
 import android.view.View
 import androidx.core.content.ContextCompat
+import com.project.helpcircle.domain.model.Nudge
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,7 +44,7 @@ class GrayscaleInterventionController @Inject constructor(
             else -> notificationManager.postGrayscaleFallbackNotification()
         }
         revertJob = controllerScope.launch {
-            delay(level.coerceIn(1, MAX_LEVEL) * LEVEL_DURATION_MILLIS)
+            delay(level.coerceIn(1, Nudge.GreyscaleLevel.MAX_LEVEL) * LEVEL_DURATION_MILLIS)
             revert()
         }
     }
@@ -55,8 +56,9 @@ class GrayscaleInterventionController @Inject constructor(
         overlayWindowController.dismiss()
     }
 
+    /** Maps [level] (1-3) directly to its 33%/66%/100% alpha, matching the 3-step grayscale scale. */
     private fun grayscaleOverlayView(level: Int): View {
-        val alpha = (level.coerceIn(1, MAX_LEVEL) * ALPHA_STEP).coerceAtMost(MAX_ALPHA)
+        val alpha = level.coerceIn(1, Nudge.GreyscaleLevel.MAX_LEVEL).toFloat() / Nudge.GreyscaleLevel.MAX_LEVEL
         return View(context).apply { setBackgroundColor(Color.argb((alpha * 255).toInt(), 128, 128, 128)) }
     }
 
@@ -74,10 +76,7 @@ class GrayscaleInterventionController @Inject constructor(
     }
 
     companion object {
-        private const val MAX_LEVEL = 5
         private const val LEVEL_DURATION_MILLIS = 20_000L
-        private const val ALPHA_STEP = 0.12f
-        private const val MAX_ALPHA = 0.6f
 
         // Public Settings.Secure keys (android.provider.Settings.Secure since API 18). Mode 0 is
         // AOSP's "simulate monochromacy" daltonizer mode, i.e. full grayscale rather than a

@@ -4,9 +4,14 @@ package com.project.helpcircle.domain.model
 sealed class Nudge(val chargeCost: Int) {
     data class Text(val message: String) : Nudge(chargeCost = 1)
 
-    data class GreyscaleLevel(val level: Int) : Nudge(chargeCost = level) {
+    /** Progressive desaturation, in 3 fixed steps (33%/66%/100%), each costing 1 charge regardless of level. */
+    data class GreyscaleLevel(val level: Int) : Nudge(chargeCost = 1) {
         init {
-            require(level >= 1) { "Grey-scale level must be at least 1" }
+            require(level in 1..MAX_LEVEL) { "Grey-scale level must be 1-$MAX_LEVEL (33%/66%/100%)" }
+        }
+
+        companion object {
+            const val MAX_LEVEL = 3
         }
     }
 

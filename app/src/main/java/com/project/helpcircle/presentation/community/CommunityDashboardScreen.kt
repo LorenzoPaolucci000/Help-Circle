@@ -152,7 +152,9 @@ private fun NudgePickerDialog(
             Column {
                 NudgeOption("Text nudge", Nudge.Text("Thinking of you"), availableCharges, isSending, onNudgeSelected)
                 NudgeOption("Haptic nudge", Nudge.Haptic, availableCharges, isSending, onNudgeSelected)
-                NudgeOption("Grey-scale", Nudge.GreyscaleLevel(level = 1), availableCharges, isSending, onNudgeSelected)
+                NudgeOption("Grey-scale 33%", Nudge.GreyscaleLevel(level = 1), availableCharges, isSending, onNudgeSelected)
+                NudgeOption("Grey-scale 66%", Nudge.GreyscaleLevel(level = 2), availableCharges, isSending, onNudgeSelected)
+                NudgeOption("Grey-scale 100%", Nudge.GreyscaleLevel(level = 3), availableCharges, isSending, onNudgeSelected)
                 NudgeOption("Content blur", Nudge.ContentBlur, availableCharges, isSending, onNudgeSelected)
             }
         },
