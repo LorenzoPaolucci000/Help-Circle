@@ -37,7 +37,9 @@ class AgencyRepositoryImpl @Inject constructor(
         agencyStateDao.upsert(
             AgencyStateEntity(
                 agencyIndexValue = index.value,
-                agencyState = current?.agencyState ?: AgencyState.Stable.toStorageName()
+                agencyState = current?.agencyState ?: AgencyState.Stable.toStorageName(),
+                deltaAutonomy = current?.deltaAutonomy ?: 0,
+                deltaSupport = current?.deltaSupport ?: 0
             )
         )
     }
@@ -47,9 +49,27 @@ class AgencyRepositoryImpl @Inject constructor(
         agencyStateDao.upsert(
             AgencyStateEntity(
                 agencyIndexValue = current?.agencyIndexValue ?: AgencyIndex.BASELINE,
-                agencyState = state.toStorageName()
+                agencyState = state.toStorageName(),
+                deltaAutonomy = current?.deltaAutonomy ?: 0,
+                deltaSupport = current?.deltaSupport ?: 0
             )
         )
+    }
+
+    override suspend fun adjustAgencyDeltas(deltaAutonomy: Int, deltaSupport: Int): AgencyIndex {
+        val current = agencyStateDao.observe().firstOrNull()
+        val newDeltaAutonomy = (current?.deltaAutonomy ?: 0) + deltaAutonomy
+        val newDeltaSupport = (current?.deltaSupport ?: 0) + deltaSupport
+        val index = AgencyIndex.calculate(newDeltaAutonomy, newDeltaSupport)
+        agencyStateDao.upsert(
+            AgencyStateEntity(
+                agencyIndexValue = index.value,
+                agencyState = current?.agencyState ?: AgencyState.Stable.toStorageName(),
+                deltaAutonomy = newDeltaAutonomy,
+                deltaSupport = newDeltaSupport
+            )
+        )
+        return index
     }
 }
 
