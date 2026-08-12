@@ -26,3 +26,12 @@ sealed class Nudge(val chargeCost: Int) {
 
     data object ContentBlur : Nudge(chargeCost = 4)
 }
+
+/** Coarse category label for local-only history (e.g. the weekly summary's intervention-category stats); never synced. */
+val Nudge.categoryLabel: String
+    get() = when (this) {
+        is Nudge.Text -> "Text"
+        is Nudge.GreyscaleLevel -> "Greyscale"
+        Nudge.Haptic -> "Haptic"
+        Nudge.ContentBlur -> "ContentBlur"
+    }

@@ -6,6 +6,7 @@ import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.engine.ForegroundAppTracker
 import com.project.helpcircle.domain.engine.ScrollSignal
 import com.project.helpcircle.domain.model.Nudge
+import com.project.helpcircle.domain.model.categoryLabel
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
@@ -77,7 +78,7 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     }
 
     private fun handleNudge(nudge: Nudge) {
-        crisisEpisodeTracker.onNudgeReceived(System.currentTimeMillis())
+        crisisEpisodeTracker.onNudgeReceived(System.currentTimeMillis(), nudge.categoryLabel)
         when (nudge) {
             is Nudge.Text -> notificationManager.postTextNudgeNotification(nudge.style.message)
             Nudge.Haptic -> {
