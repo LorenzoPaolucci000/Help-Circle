@@ -7,6 +7,7 @@ import com.project.helpcircle.data.local.dao.ActiveCommunityDao
 import com.project.helpcircle.data.local.dao.AgencyStateDao
 import com.project.helpcircle.data.local.dao.ChargeWalletDao
 import com.project.helpcircle.data.local.dao.FocusSessionDao
+import com.project.helpcircle.data.local.dao.MonitoredAppDao
 import com.project.helpcircle.data.local.dao.UserIdentityDao
 import dagger.Module
 import dagger.Provides
@@ -41,4 +42,7 @@ object DatabaseModule {
 
     @Provides
     fun provideActiveCommunityDao(database: AppDatabase): ActiveCommunityDao = database.activeCommunityDao()
+
+    @Provides
+    fun provideMonitoredAppDao(database: AppDatabase): MonitoredAppDao = database.monitoredAppDao()
 }

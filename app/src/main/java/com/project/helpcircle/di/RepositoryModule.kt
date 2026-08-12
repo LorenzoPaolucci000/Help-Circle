@@ -2,10 +2,12 @@ package com.project.helpcircle.di
 
 import com.project.helpcircle.data.repository.AgencyRepositoryImpl
 import com.project.helpcircle.data.repository.CommunityRepositoryImpl
+import com.project.helpcircle.data.repository.MonitoredAppsRepositoryImpl
 import com.project.helpcircle.data.repository.NudgeRepositoryImpl
 import com.project.helpcircle.data.repository.UserRepositoryImpl
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import dagger.Binds
@@ -29,4 +31,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindNudgeRepository(impl: NudgeRepositoryImpl): NudgeRepository
+
+    @Binds
+    abstract fun bindMonitoredAppsRepository(impl: MonitoredAppsRepositoryImpl): MonitoredAppsRepository
 }
