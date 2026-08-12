@@ -10,6 +10,7 @@ import com.project.helpcircle.domain.model.AgencyIndex
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.MemberStatus
+import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import javax.inject.Inject
@@ -18,15 +19,18 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 
 /**
  * Firestore-backed [CommunityRepository]. The privacy filter below caps what ever leaves the
  * device: the community-wide event stream carries only [FIELD_TYPE], [FIELD_COMMUNITY_ID] and
  * [FIELD_SENDER_ID] (an anonymous UID); the per-member roster under [MEMBERS_COLLECTION] carries
- * only a self-chosen [FIELD_NICKNAME] and a coarse [FIELD_STATUS] tier, visible to fellow members
- * of the same community only. Never sent: app names, scroll data, usage durations, individual
- * IA_ind scores, or usage timestamps, per the Zero-PII rule.
+ * only a self-chosen [FIELD_NICKNAME], a coarse [FIELD_STATUS] tier, and the derived
+ * [FIELD_AGENCY_SCORE] (0-100), visible to fellow members of the same community only. Never sent:
+ * app names, scroll data, usage durations, or usage timestamps, per the Zero-PII rule —
+ * `agencyScore` is a derived index, not behavioral data, and reveals nothing about which app,
+ * duration, or activity produced it.
  *
  * [observeCommunityState] is a cold Firestore snapshot listener: it starts on subscription and
  * is torn down when the collecting coroutine is cancelled, so a lifecycle-aware collector (e.g.
@@ -39,6 +43,7 @@ import kotlinx.coroutines.tasks.await
 class CommunityRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val userRepository: UserRepository,
+    private val agencyRepository: AgencyRepository,
     private val activeCommunityDao: ActiveCommunityDao
 ) : CommunityRepository {
 
@@ -129,13 +134,15 @@ class CommunityRepositoryImpl @Inject constructor(
         awaitClose { registration.remove() }
     }
 
-    /** Writes only this device's own roster entry — nickname and coarse status, per Zero-PII. */
+    /** Writes only this device's own roster entry — nickname, coarse status, and derived agencyScore, per Zero-PII. */
     private suspend fun writeOwnMemberDoc(communityId: String, status: MemberStatus) {
         val identity = userRepository.getOrCreateIdentity()
+        val agencyScore = agencyRepository.currentAgencyIndex.first().value
         communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash).set(
             mapOf(
                 FIELD_NICKNAME to identity.nickname,
                 FIELD_STATUS to status.toFirestoreValue(),
+                FIELD_AGENCY_SCORE to agencyScore,
                 FIELD_LAST_SEEN to FieldValue.serverTimestamp()
             ),
             SetOptions.merge()
@@ -179,7 +186,8 @@ class CommunityRepositoryImpl @Inject constructor(
     private fun DocumentSnapshot.toCommunityMember(): CommunityMember = CommunityMember(
         anonymousId = id,
         nickname = getString(FIELD_NICKNAME).orEmpty(),
-        status = (getString(FIELD_STATUS) ?: MemberStatus.OK.toFirestoreValue()).toMemberStatus()
+        status = (getString(FIELD_STATUS) ?: MemberStatus.OK.toFirestoreValue()).toMemberStatus(),
+        agencyScore = (getLong(FIELD_AGENCY_SCORE) ?: AgencyIndex.BASELINE.toLong()).toInt()
     )
 
     private fun MemberStatus.toFirestoreValue(): String = when (this) {
@@ -209,6 +217,7 @@ class CommunityRepositoryImpl @Inject constructor(
         private const val FIELD_TIMESTAMP = "timestamp"
         private const val FIELD_NICKNAME = "nickname"
         private const val FIELD_STATUS = "status"
+        private const val FIELD_AGENCY_SCORE = "agencyScore"
         private const val FIELD_LAST_SEEN = "lastSeen"
         private const val FIELD_INVITE_CODE = "inviteCode"
     }

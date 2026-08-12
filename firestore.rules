@@ -25,14 +25,18 @@ service cloud.firestore {
         allow read: if request.auth != null
           && exists(/databases/$(database)/documents/communities/$(communityId)/members/$(request.auth.uid));
 
-        // A member may only ever write their own entry, and only nickname/status/lastSeen —
-        // never anything else, per the Zero-PII rule.
+        // A member may only ever write their own entry, and only nickname/status/agencyScore/
+        // lastSeen — never anything else, per the Zero-PII rule. agencyScore is a derived 0-100
+        // IA_ind value, not behavioral data, so sharing it doesn't violate Zero-PII.
         allow write: if request.auth != null
           && request.auth.uid == memberId
-          && request.resource.data.keys().hasOnly(['nickname', 'status', 'lastSeen'])
+          && request.resource.data.keys().hasOnly(['nickname', 'status', 'agencyScore', 'lastSeen'])
           && request.resource.data.nickname is string
           && request.resource.data.nickname.size() <= 20
-          && request.resource.data.status in ['ok', 'at_risk', 'crisis'];
+          && request.resource.data.status in ['ok', 'at_risk', 'crisis']
+          && request.resource.data.agencyScore is int
+          && request.resource.data.agencyScore >= 0
+          && request.resource.data.agencyScore <= 100;
       }
 
       match /events/{eventId} {
