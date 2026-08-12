@@ -14,6 +14,7 @@ import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
 import com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase
+import com.project.helpcircle.domain.usecase.IsFocusModeActiveUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
@@ -116,4 +117,9 @@ object UseCaseModule {
     fun provideGetInstalledAppsUseCase(
         installedAppsRepository: InstalledAppsRepository
     ): GetInstalledAppsUseCase = GetInstalledAppsUseCase(installedAppsRepository)
+
+    @Provides
+    fun provideIsFocusModeActiveUseCase(
+        foregroundAppTracker: ForegroundAppTracker
+    ): IsFocusModeActiveUseCase = IsFocusModeActiveUseCase(foregroundAppTracker)
 }
