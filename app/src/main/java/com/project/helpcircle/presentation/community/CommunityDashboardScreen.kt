@@ -208,10 +208,11 @@ private fun LivingLandscapeBackground(landscape: VisualLandscape, modifier: Modi
 }
 
 private fun landscapeColors(landscape: VisualLandscape): Pair<Color, Color> = when (landscape) {
-    VisualLandscape.STORM -> Color(0xFF37474F) to Color(0xFF102027)
-    VisualLandscape.OVERCAST -> Color(0xFF78909C) to Color(0xFF455A64)
-    VisualLandscape.CALM -> Color(0xFF81C7D4) to Color(0xFF4F9A94)
-    VisualLandscape.BLOOMING_MEADOW -> Color(0xFFAED581) to Color(0xFF66BB6A)
+    VisualLandscape.TEMPEST -> Color(0xFF263238) to Color(0xFF0B0F12)
+    VisualLandscape.RAINY -> Color(0xFF607D8B) to Color(0xFF455A64)
+    VisualLandscape.MISTY -> Color(0xFFCFD8DC) to Color(0xFFA6B4B8)
+    VisualLandscape.SERENE -> Color(0xFF81C7D4) to Color(0xFF4F9A94)
+    VisualLandscape.FLOURISHING -> Color(0xFFFFE082) to Color(0xFF8BC34A)
 }
 
 /** Large, central IA_comm score; shows "--" when solo, since one member has nothing to average. */

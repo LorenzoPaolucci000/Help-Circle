@@ -14,7 +14,6 @@ import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import javax.inject.Inject
-import kotlin.math.roundToInt
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -96,14 +95,11 @@ class CommunityRepositoryImpl @Inject constructor(
     override suspend fun reportCrisis(communityId: String) {
         writeEvent(communityId, EVENT_TYPE_CRISIS_ALERT)
         writeOwnMemberDoc(communityId, MemberStatus.CRISIS)
-        // MVP_STUB: recomputing IA_comm from crisis/nudge events and refreshing the community
-        // document's activeMembers/lastActivity presence is deferred to a later step.
     }
 
     override suspend fun reportRecovery(communityId: String) {
         writeEvent(communityId, EVENT_TYPE_RECOVERY_REPORTED)
         writeOwnMemberDoc(communityId, MemberStatus.OK)
-        // MVP_STUB: recomputing IA_comm/IA_ind from a recovery event is deferred to a later step.
     }
 
     override suspend fun getActiveCommunityId(): String? = activeCommunityDao.get()?.communityId
@@ -168,16 +164,14 @@ class CommunityRepositoryImpl @Inject constructor(
         communityId: String,
         members: List<CommunityMember>
     ): CommunityState {
-        val activeMembers = (getLong(FIELD_ACTIVE_MEMBERS) ?: 0L).toInt().coerceAtLeast(1)
-        val iaComm = AgencyIndex.of((getDouble(FIELD_IA_COMM) ?: AgencyIndex.BASELINE.toDouble()).roundToInt())
-        // The remote doc only ever stores the community-wide IA_comm aggregate, never individual
-        // IA_ind scores (Zero-PII). Filling memberAgencyIndices with activeMembers copies of that
-        // same value keeps CommunityState.collectiveIndex's average equal to IA_comm exactly,
-        // without a cohesion bonus being re-applied on top of an already-aggregated remote value.
+        // IA_comm = Clamp(average(members' agencyScore) + B_cohesion, 0, 100); B_cohesion is +5
+        // only if every member's agencyScore >= 60, else 0. CommunityState.collectiveIndex applies
+        // this same average-plus-bonus-then-clamp formula, so it's enough to hand it each member's
+        // real per-member index and whether the all-members->=-60 condition holds.
         return CommunityState(
             communityId = communityId,
-            memberAgencyIndices = List(activeMembers) { iaComm },
-            cohesionBonusApplied = false,
+            memberAgencyIndices = members.map { AgencyIndex.of(it.agencyScore) },
+            cohesionBonusApplied = members.isNotEmpty() && members.all { it.agencyScore >= COHESION_THRESHOLD },
             members = members,
             inviteCode = getString(FIELD_INVITE_CODE).orEmpty()
         )
@@ -209,7 +203,6 @@ class CommunityRepositoryImpl @Inject constructor(
         private const val EVENT_TYPE_CRISIS_ALERT = "crisis_alert"
         private const val EVENT_TYPE_RECOVERY_REPORTED = "recovery_reported"
         private const val FIELD_ACTIVE_MEMBERS = "activeMembers"
-        private const val FIELD_IA_COMM = "IA_comm"
         private const val FIELD_LAST_ACTIVITY = "lastActivity"
         private const val FIELD_TYPE = "type"
         private const val FIELD_COMMUNITY_ID = "communityId"
@@ -220,5 +213,8 @@ class CommunityRepositoryImpl @Inject constructor(
         private const val FIELD_AGENCY_SCORE = "agencyScore"
         private const val FIELD_LAST_SEEN = "lastSeen"
         private const val FIELD_INVITE_CODE = "inviteCode"
+
+        /** Minimum per-member agencyScore, held by every member, for the IA_comm cohesion bonus. */
+        private const val COHESION_THRESHOLD = 60
     }
 }

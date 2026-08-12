@@ -32,7 +32,7 @@ data class CommunityDashboardUiState(
     val isSolo: Boolean = false,
     val inviteCode: String = "",
     val collectiveIndex: Int = 50,
-    val visualLandscape: VisualLandscape = VisualLandscape.OVERCAST,
+    val visualLandscape: VisualLandscape = VisualLandscape.MISTY,
     val members: List<CommunityMember> = emptyList(),
     val latestNudge: Nudge? = null,
     val availableCharges: Int = ChargeWallet.MAX_CHARGES,
