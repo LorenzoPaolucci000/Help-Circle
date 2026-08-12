@@ -4,25 +4,35 @@ import com.project.helpcircle.data.local.dao.AgencyStateDao
 import com.project.helpcircle.data.local.dao.FocusSessionDao
 import com.project.helpcircle.data.local.entity.AgencyStateEntity
 import com.project.helpcircle.data.local.entity.FocusSessionEntity
+import com.project.helpcircle.domain.engine.WeeklyResetCalculator
 import com.project.helpcircle.domain.model.AgencyIndex
 import com.project.helpcircle.domain.model.AgencyState
 import com.project.helpcircle.domain.model.FocusSession
 import com.project.helpcircle.domain.repository.AgencyRepository
+import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 
-/** Room-backed [AgencyRepository]: persists the current agency index/state and session history locally. */
+/**
+ * Room-backed [AgencyRepository]: persists the current agency index/state and session history
+ * locally. [currentAgencyIndex] also lazily catches up the weekly reset (archive → reset to
+ * baseline → generate summary) against the current time on every read — same no-background-job
+ * pattern as [ObserveChargeWalletUseCase][com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase] —
+ * so every reader (including [CommunityRepositoryImpl]'s Firestore sync) transparently sees an
+ * up-to-date index without needing to know about the reset at all.
+ */
 class AgencyRepositoryImpl @Inject constructor(
     private val agencyStateDao: AgencyStateDao,
-    private val focusSessionDao: FocusSessionDao
+    private val focusSessionDao: FocusSessionDao,
+    private val weeklyHistoryRepository: WeeklyHistoryRepository
 ) : AgencyRepository {
 
     override val currentAgencyIndex: Flow<AgencyIndex> = agencyStateDao.observe()
         .filterNotNull()
-        .map { AgencyIndex.of(it.agencyIndexValue) }
+        .map { applyWeeklyResetIfDue(AgencyIndex.of(it.agencyIndexValue)) }
 
     override val currentAgencyState: Flow<AgencyState> = agencyStateDao.observe()
         .filterNotNull()
@@ -85,6 +95,24 @@ class AgencyRepositoryImpl @Inject constructor(
         agencyIndexValue = AgencyIndex.BASELINE,
         agencyState = AgencyState.Stable.toStorageName()
     )
+
+    private suspend fun applyWeeklyResetIfDue(index: AgencyIndex): AgencyIndex {
+        val boundaryMillis = WeeklyResetCalculator.mostRecentResetBoundaryMillis(System.currentTimeMillis())
+        val lastReset = getLastWeeklyResetAtEpochMillis()
+        if (lastReset != null && lastReset >= boundaryMillis) return index
+
+        val weekStartMillis = boundaryMillis - WeeklyResetCalculator.WEEK_DURATION_MILLIS
+        val episodes = weeklyHistoryRepository.getCrisisEpisodesSince(weekStartMillis)
+        val previousArchived = getLastArchivedAgencyIndex()
+        val delta = index.value - (previousArchived ?: AgencyIndex.BASELINE)
+
+        weeklyHistoryRepository.saveWeeklySummary(
+            WeeklyResetCalculator.buildWeeklySummary(boundaryMillis, delta, episodes)
+        )
+        archiveAgencyIndex(index.value)
+        resetAgencyIndexForNewWeek(boundaryMillis)
+        return AgencyIndex.baseline()
+    }
 }
 
 private fun AgencyState.toStorageName(): String = when (this) {

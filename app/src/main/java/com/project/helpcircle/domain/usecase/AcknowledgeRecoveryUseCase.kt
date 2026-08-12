@@ -2,7 +2,9 @@ package com.project.helpcircle.domain.usecase
 
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.model.AgencyState
+import com.project.helpcircle.domain.model.CrisisEpisodeRecord
 import com.project.helpcircle.domain.repository.AgencyRepository
+import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
 
 /**
  * Explicitly closes out the current crisis episode when the user taps "I'm back" on a nudge
@@ -14,13 +16,19 @@ import com.project.helpcircle.domain.repository.AgencyRepository
 class AcknowledgeRecoveryUseCase(
     private val agencyRepository: AgencyRepository,
     private val crisisEpisodeTracker: CrisisEpisodeTracker,
-    private val calculateAgencyIndexUseCase: CalculateAgencyIndexUseCase
+    private val calculateAgencyIndexUseCase: CalculateAgencyIndexUseCase,
+    private val weeklyHistoryRepository: WeeklyHistoryRepository
 ) {
     suspend operator fun invoke(atEpochMillis: Long) {
         agencyRepository.reportAgencyState(AgencyState.Stable)
         val delta = crisisEpisodeTracker.onAgencyStateUpdated(AgencyState.Stable, atEpochMillis)
         if (!delta.isEmpty) {
             calculateAgencyIndexUseCase(delta.deltaAutonomy, delta.deltaSupport)
+        }
+        delta.closedEpisode?.let { episode ->
+            weeklyHistoryRepository.recordCrisisEpisode(
+                CrisisEpisodeRecord(episode.startedAtEpochMillis, episode.nudgeCategory, episode.wasEffectiveIntervention)
+            )
         }
     }
 }
