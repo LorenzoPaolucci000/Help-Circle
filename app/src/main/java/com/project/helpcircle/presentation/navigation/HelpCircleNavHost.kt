@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.community.CommunityDashboardScreen
 import com.project.helpcircle.presentation.community.JoinCommunityScreen
 import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
+import com.project.helpcircle.presentation.settings.SettingsScreen
 import com.project.helpcircle.presentation.startup.StartupDestination
 import com.project.helpcircle.presentation.startup.StartupScreen
 
@@ -55,7 +56,12 @@ fun HelpCircleNavHost(
             )
         }
         composable(Destination.CommunityDashboard.route) {
-            CommunityDashboardScreen()
+            CommunityDashboardScreen(
+                onOpenSettings = { navController.navigate(Destination.Settings.route) }
+            )
+        }
+        composable(Destination.Settings.route) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

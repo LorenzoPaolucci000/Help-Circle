@@ -42,18 +42,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.Nudge
+import com.project.helpcircle.domain.model.TextNudgeStyle
 import com.project.helpcircle.domain.model.VisualLandscape
 import kotlinx.coroutines.delay
 
 /** Entry point: hoists [CommunityDashboardViewModel] state and hands it to the stateless content below. */
 @Composable
 fun CommunityDashboardScreen(
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CommunityDashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     CommunityDashboardContent(
         uiState = uiState,
+        onOpenSettings = onOpenSettings,
         onMemberClicked = viewModel::onMemberClicked,
         onNudgePickerDismissed = viewModel::onNudgePickerDismissed,
         onNudgeSelected = viewModel::onNudgeSelected,
@@ -65,6 +68,7 @@ fun CommunityDashboardScreen(
 @Composable
 private fun CommunityDashboardContent(
     uiState: CommunityDashboardUiState,
+    onOpenSettings: () -> Unit,
     onMemberClicked: (CommunityMember) -> Unit,
     onNudgePickerDismissed: () -> Unit,
     onNudgeSelected: (Nudge) -> Unit,
@@ -73,6 +77,10 @@ private fun CommunityDashboardContent(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         LivingLandscapeBackground(landscape = uiState.visualLandscape, modifier = Modifier.fillMaxSize())
+
+        TextButton(onClick = onOpenSettings, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            Text("Settings")
+        }
 
         when {
             uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -150,7 +158,9 @@ private fun NudgePickerDialog(
         title = { Text("Send a nudge to ${target.nickname.ifBlank { "Anonymous" }}") },
         text = {
             Column {
-                NudgeOption("Text nudge", Nudge.Text("Thinking of you"), availableCharges, isSending, onNudgeSelected)
+                NudgeOption("Text: Comic", Nudge.Text(TextNudgeStyle.COMIC), availableCharges, isSending, onNudgeSelected)
+                NudgeOption("Text: Poetic", Nudge.Text(TextNudgeStyle.POETIC), availableCharges, isSending, onNudgeSelected)
+                NudgeOption("Text: Severe", Nudge.Text(TextNudgeStyle.SEVERE), availableCharges, isSending, onNudgeSelected)
                 NudgeOption("Haptic nudge", Nudge.Haptic, availableCharges, isSending, onNudgeSelected)
                 NudgeOption("Grey-scale 33%", Nudge.GreyscaleLevel(level = 1), availableCharges, isSending, onNudgeSelected)
                 NudgeOption("Grey-scale 66%", Nudge.GreyscaleLevel(level = 2), availableCharges, isSending, onNudgeSelected)

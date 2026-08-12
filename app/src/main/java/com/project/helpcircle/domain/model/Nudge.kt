@@ -1,8 +1,15 @@
 package com.project.helpcircle.domain.model
 
+/** Fixed text-nudge presets — not free text, so senders can't be quoted saying something unintended. */
+enum class TextNudgeStyle(val message: String) {
+    COMIC("Your thumb is begging for mercy!"),
+    POETIC("The world outside the screen is in full bloom"),
+    SEVERE("Stop scrolling and close the app immediately")
+}
+
 /** A peer intervention a user can send, each costing a fixed number of charges from [ChargeWallet]. */
 sealed class Nudge(val chargeCost: Int) {
-    data class Text(val message: String) : Nudge(chargeCost = 1)
+    data class Text(val style: TextNudgeStyle) : Nudge(chargeCost = 1)
 
     /** Progressive desaturation, in 3 fixed steps (33%/66%/100%), each costing 1 charge regardless of level. */
     data class GreyscaleLevel(val level: Int) : Nudge(chargeCost = 1) {

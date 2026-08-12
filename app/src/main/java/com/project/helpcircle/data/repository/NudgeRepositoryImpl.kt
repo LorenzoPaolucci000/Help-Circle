@@ -5,6 +5,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.project.helpcircle.domain.model.Nudge
+import com.project.helpcircle.domain.model.TextNudgeStyle
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import javax.inject.Inject
@@ -17,10 +18,12 @@ import kotlinx.coroutines.tasks.await
  * Firestore-backed [NudgeRepository]. Nudges ride the same `/communities/{id}/events`
  * collection [CommunityRepositoryImpl] writes crisis alerts to, tagged `type = "nudge_sent"`
  * plus [FIELD_TARGET_ID] so a specific recipient's listener can pick them out, and either
- * [FIELD_MESSAGE] or [FIELD_LEVEL] depending on [Nudge] subtype. None of this is on the Zero-PII
+ * [FIELD_STYLE] or [FIELD_LEVEL] depending on [Nudge] subtype. None of this is on the Zero-PII
  * blacklist (app names, scroll data, usage durations, IA_ind, usage timestamps) — it's
  * sender-authored nudge content the recipient's device needs to actually render the
- * intervention, not passively-collected behavioral data.
+ * intervention, not passively-collected behavioral data. [FIELD_STYLE] carries only the
+ * [TextNudgeStyle] preset name, never free text, so a recipient's device renders the message
+ * from its own local copy of [TextNudgeStyle.message] rather than trusting sender-supplied text.
  *
  * [incomingNudges] runs one `collectionGroup` listener across every community's `events`
  * subcollection, filtered to `nudge_sent` docs addressed to the local anonymous UID. It only
@@ -75,14 +78,16 @@ class NudgeRepositoryImpl @Inject constructor(
     }
 
     private fun Nudge.toEventFields(): Map<String, Any?> = when (this) {
-        is Nudge.Text -> mapOf(FIELD_NUDGE_TYPE to NUDGE_TYPE_TEXT, FIELD_MESSAGE to message)
+        is Nudge.Text -> mapOf(FIELD_NUDGE_TYPE to NUDGE_TYPE_TEXT, FIELD_STYLE to style.name)
         is Nudge.GreyscaleLevel -> mapOf(FIELD_NUDGE_TYPE to NUDGE_TYPE_GREYSCALE, FIELD_LEVEL to level)
         Nudge.Haptic -> mapOf(FIELD_NUDGE_TYPE to NUDGE_TYPE_HAPTIC)
         Nudge.ContentBlur -> mapOf(FIELD_NUDGE_TYPE to NUDGE_TYPE_BLUR)
     }
 
     private fun toNudge(nudgeType: String, doc: DocumentSnapshot): Nudge? = when (nudgeType) {
-        NUDGE_TYPE_TEXT -> doc.getString(FIELD_MESSAGE)?.let { Nudge.Text(it) }
+        NUDGE_TYPE_TEXT -> doc.getString(FIELD_STYLE)
+            ?.let { styleName -> runCatching { TextNudgeStyle.valueOf(styleName) }.getOrNull() }
+            ?.let { Nudge.Text(it) }
         NUDGE_TYPE_GREYSCALE -> doc.getLong(FIELD_LEVEL)?.toInt()?.let { Nudge.GreyscaleLevel(it) }
         NUDGE_TYPE_HAPTIC -> Nudge.Haptic
         NUDGE_TYPE_BLUR -> Nudge.ContentBlur
@@ -98,7 +103,7 @@ class NudgeRepositoryImpl @Inject constructor(
         private const val FIELD_SENDER_ID = "senderId"
         private const val FIELD_TARGET_ID = "targetId"
         private const val FIELD_NUDGE_TYPE = "nudgeType"
-        private const val FIELD_MESSAGE = "message"
+        private const val FIELD_STYLE = "style"
         private const val FIELD_LEVEL = "level"
         private const val FIELD_TIMESTAMP = "timestamp"
 

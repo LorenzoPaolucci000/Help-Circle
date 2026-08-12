@@ -79,7 +79,7 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     private fun handleNudge(nudge: Nudge) {
         crisisEpisodeTracker.onNudgeReceived(System.currentTimeMillis())
         when (nudge) {
-            is Nudge.Text -> notificationManager.postTextNudgeNotification(nudge.message)
+            is Nudge.Text -> notificationManager.postTextNudgeNotification(nudge.style.message)
             Nudge.Haptic -> {
                 notificationManager.fireHapticPattern()
                 notificationManager.postHapticNudgeNotification()
