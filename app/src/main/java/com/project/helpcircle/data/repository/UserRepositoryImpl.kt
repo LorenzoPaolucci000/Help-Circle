@@ -12,6 +12,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -41,7 +42,19 @@ class UserRepositoryImpl @Inject constructor(
         userIdentityDao.insert(UserIdentityEntity(anonymousHash = identity.anonymousHash, nickname = nickname))
     }
 
+    // No row exists until the very first read; self-heal by seeding one at full charges rather
+    // than requiring every caller to know about a separate get-or-create step.
     override val chargeWallet: Flow<ChargeWallet> = chargeWalletDao.observe()
+        .onEach { entity ->
+            if (entity == null) {
+                chargeWalletDao.upsert(
+                    ChargeWalletEntity(
+                        currentCharges = ChargeWallet.MAX_CHARGES,
+                        lastReplenishedAtEpochMillis = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
         .filterNotNull()
         .map { ChargeWallet(it.currentCharges, it.lastReplenishedAtEpochMillis) }
 

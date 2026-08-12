@@ -17,6 +17,7 @@ import com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase
 import com.project.helpcircle.domain.usecase.IsFocusModeActiveUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityUseCase
+import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
@@ -102,9 +103,16 @@ object UseCaseModule {
     ): JoinCommunityByInviteCodeUseCase = JoinCommunityByInviteCodeUseCase(communityRepository)
 
     @Provides
+    fun provideObserveChargeWalletUseCase(
+        userRepository: UserRepository,
+        isFocusModeActiveUseCase: IsFocusModeActiveUseCase
+    ): ObserveChargeWalletUseCase = ObserveChargeWalletUseCase(userRepository, isFocusModeActiveUseCase)
+
+    @Provides
     fun provideConsumeChargeUseCase(
-        userRepository: UserRepository
-    ): ConsumeChargeUseCase = ConsumeChargeUseCase(userRepository)
+        userRepository: UserRepository,
+        observeChargeWalletUseCase: ObserveChargeWalletUseCase
+    ): ConsumeChargeUseCase = ConsumeChargeUseCase(userRepository, observeChargeWalletUseCase)
 
     @Provides
     fun provideSendNudgeUseCase(

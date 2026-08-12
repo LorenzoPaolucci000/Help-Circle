@@ -8,8 +8,8 @@ import com.project.helpcircle.domain.model.CommunityObservation
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.VisualLandscape
 import com.project.helpcircle.domain.repository.CommunityRepository
-import com.project.helpcircle.domain.repository.UserRepository
 import com.project.helpcircle.domain.usecase.NudgeResult
+import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
@@ -44,7 +44,7 @@ data class CommunityDashboardUiState(
 @HiltViewModel
 class CommunityDashboardViewModel @Inject constructor(
     private val communityRepository: CommunityRepository,
-    private val userRepository: UserRepository,
+    private val observeChargeWallet: ObserveChargeWalletUseCase,
     private val observeCommunityState: ObserveCommunityStateUseCase,
     private val observeIncomingNudges: ObserveIncomingNudgesUseCase,
     private val sendNudge: SendNudgeUseCase
@@ -97,7 +97,7 @@ class CommunityDashboardViewModel @Inject constructor(
             .onEach { nudge -> _uiState.update { it.copy(latestNudge = nudge) } }
             .launchIn(viewModelScope)
 
-        userRepository.chargeWallet
+        observeChargeWallet()
             .onEach { wallet -> _uiState.update { it.copy(availableCharges = wallet.currentCharges) } }
             .launchIn(viewModelScope)
     }
