@@ -14,6 +14,15 @@
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Package-visibility declaration (API 30+): without this, InstalledAppsRepositoryImpl's
+         queryIntentActivities call for the monitored-apps blacklist would only see this app. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".HelpCircleApplication"
         android:allowBackup="true"

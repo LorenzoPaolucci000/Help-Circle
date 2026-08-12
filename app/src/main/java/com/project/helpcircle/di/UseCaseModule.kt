@@ -4,6 +4,7 @@ import com.project.helpcircle.domain.engine.AgencyDetectionEngine
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.InstalledAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import com.project.helpcircle.domain.usecase.AcknowledgeRecoveryUseCase
@@ -11,6 +12,7 @@ import com.project.helpcircle.domain.usecase.CalculateAgencyIndexUseCase
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
+import com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
@@ -104,4 +106,9 @@ object UseCaseModule {
         communityRepository: CommunityRepository,
         consumeChargeUseCase: ConsumeChargeUseCase
     ): SendNudgeUseCase = SendNudgeUseCase(nudgeRepository, communityRepository, consumeChargeUseCase)
+
+    @Provides
+    fun provideGetInstalledAppsUseCase(
+        installedAppsRepository: InstalledAppsRepository
+    ): GetInstalledAppsUseCase = GetInstalledAppsUseCase(installedAppsRepository)
 }

@@ -7,9 +7,11 @@ import com.project.helpcircle.data.repository.NudgeRepositoryImpl
 import com.project.helpcircle.data.repository.UserRepositoryImpl
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.InstalledAppsRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
+import com.project.helpcircle.os.InstalledAppsRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -34,4 +36,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindMonitoredAppsRepository(impl: MonitoredAppsRepositoryImpl): MonitoredAppsRepository
+
+    @Binds
+    abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository
 }
