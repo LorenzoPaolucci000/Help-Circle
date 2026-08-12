@@ -6,6 +6,7 @@ import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
+import com.project.helpcircle.domain.usecase.AcknowledgeRecoveryUseCase
 import com.project.helpcircle.domain.usecase.CalculateAgencyIndexUseCase
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
@@ -48,6 +49,17 @@ object UseCaseModule {
         calculateAgencyIndexUseCase: CalculateAgencyIndexUseCase
     ): DetectLossOfAgencyUseCase = DetectLossOfAgencyUseCase(
         agencyDetectionEngine,
+        agencyRepository,
+        crisisEpisodeTracker,
+        calculateAgencyIndexUseCase
+    )
+
+    @Provides
+    fun provideAcknowledgeRecoveryUseCase(
+        agencyRepository: AgencyRepository,
+        crisisEpisodeTracker: CrisisEpisodeTracker,
+        calculateAgencyIndexUseCase: CalculateAgencyIndexUseCase
+    ): AcknowledgeRecoveryUseCase = AcknowledgeRecoveryUseCase(
         agencyRepository,
         crisisEpisodeTracker,
         calculateAgencyIndexUseCase

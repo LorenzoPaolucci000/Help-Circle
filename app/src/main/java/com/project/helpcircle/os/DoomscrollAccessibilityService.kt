@@ -2,6 +2,7 @@ package com.project.helpcircle.os
 
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
+import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.engine.ScrollSignal
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.repository.NudgeRepository
@@ -25,13 +26,17 @@ import kotlinx.coroutines.launch
  * Runs itself as a foreground service with a silent, persistent notification so aggressive OEM
  * battery managers are less likely to kill it while it's the only thing keeping the doomscroll
  * detector alive. Being the app's one long-running background component, it also collects
- * [NudgeRepository.incomingNudges] and dispatches each one to [HelpCircleNotificationManager].
+ * [NudgeRepository.incomingNudges] and dispatches each one to [HelpCircleNotificationManager],
+ * and marks the delivery on [CrisisEpisodeTracker] so it can score how the crisis episode ends.
  */
 @AndroidEntryPoint
 class DoomscrollAccessibilityService : AccessibilityService() {
 
     @Inject
     lateinit var detectLossOfAgencyUseCase: DetectLossOfAgencyUseCase
+
+    @Inject
+    lateinit var crisisEpisodeTracker: CrisisEpisodeTracker
 
     @Inject
     lateinit var nudgeRepository: NudgeRepository
@@ -59,6 +64,7 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     }
 
     private fun handleNudge(nudge: Nudge) {
+        crisisEpisodeTracker.onNudgeReceived(System.currentTimeMillis())
         when (nudge) {
             is Nudge.Text -> notificationManager.postTextNudgeNotification(nudge.message)
             Nudge.Haptic -> {

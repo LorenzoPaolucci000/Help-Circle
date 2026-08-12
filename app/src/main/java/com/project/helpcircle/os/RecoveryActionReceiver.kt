@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.usecase.AcknowledgeRecoveryUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -13,16 +14,20 @@ import kotlinx.coroutines.launch
 
 /**
  * Handles the "I'm back" action on a delivered-nudge notification: reverts any active visual
- * intervention, reports recovery to the device's active community, and dismisses the
- * notification. Uses `goAsync()` since a BroadcastReceiver's `onReceive` returns before the
- * suspend call to Firestore would finish. Reverting is unconditional and safe to call even when
- * no intervention is active — both controllers' `revert()` are no-ops in that case.
+ * intervention, closes out the crisis episode (awarding whichever IA_ind delta the acknowledgment
+ * timing earns, via [AcknowledgeRecoveryUseCase]), reports recovery to the device's active
+ * community, and dismisses the notification. Uses `goAsync()` since a BroadcastReceiver's
+ * `onReceive` returns before the suspend calls would finish. Reverting is unconditional and safe
+ * to call even when no intervention is active — both controllers' `revert()` are no-ops in that case.
  */
 @AndroidEntryPoint
 class RecoveryActionReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var communityRepository: CommunityRepository
+
+    @Inject
+    lateinit var acknowledgeRecoveryUseCase: AcknowledgeRecoveryUseCase
 
     @Inject
     lateinit var grayscaleInterventionController: GrayscaleInterventionController
@@ -37,6 +42,7 @@ class RecoveryActionReceiver : BroadcastReceiver() {
         contentBlurInterventionController.revert()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                acknowledgeRecoveryUseCase(System.currentTimeMillis())
                 communityRepository.getActiveCommunityId()?.let { communityRepository.reportRecovery(it) }
                 if (notificationId != -1) {
                     val notificationManager =
