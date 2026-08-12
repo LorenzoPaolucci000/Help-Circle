@@ -1,10 +1,12 @@
 package com.project.helpcircle.di
 
 import com.project.helpcircle.domain.engine.AgencyDetectionEngine
+import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
+import com.project.helpcircle.domain.usecase.CalculateAgencyIndexUseCase
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
@@ -30,10 +32,26 @@ object UseCaseModule {
     fun provideAgencyDetectionEngine(): AgencyDetectionEngine = AgencyDetectionEngine()
 
     @Provides
+    @Singleton
+    fun provideCrisisEpisodeTracker(): CrisisEpisodeTracker = CrisisEpisodeTracker()
+
+    @Provides
+    fun provideCalculateAgencyIndexUseCase(
+        agencyRepository: AgencyRepository
+    ): CalculateAgencyIndexUseCase = CalculateAgencyIndexUseCase(agencyRepository)
+
+    @Provides
     fun provideDetectLossOfAgencyUseCase(
         agencyDetectionEngine: AgencyDetectionEngine,
-        agencyRepository: AgencyRepository
-    ): DetectLossOfAgencyUseCase = DetectLossOfAgencyUseCase(agencyDetectionEngine, agencyRepository)
+        agencyRepository: AgencyRepository,
+        crisisEpisodeTracker: CrisisEpisodeTracker,
+        calculateAgencyIndexUseCase: CalculateAgencyIndexUseCase
+    ): DetectLossOfAgencyUseCase = DetectLossOfAgencyUseCase(
+        agencyDetectionEngine,
+        agencyRepository,
+        crisisEpisodeTracker,
+        calculateAgencyIndexUseCase
+    )
 
     @Provides
     fun provideObserveCommunityStateUseCase(
