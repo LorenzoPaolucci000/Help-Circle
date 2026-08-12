@@ -9,6 +9,7 @@ import com.project.helpcircle.data.local.dao.ChargeWalletDao
 import com.project.helpcircle.data.local.dao.FocusSessionDao
 import com.project.helpcircle.data.local.dao.MonitoredAppDao
 import com.project.helpcircle.data.local.dao.UserIdentityDao
+import com.project.helpcircle.data.local.dao.WeeklyHistoryDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -45,4 +46,7 @@ object DatabaseModule {
 
     @Provides
     fun provideMonitoredAppDao(database: AppDatabase): MonitoredAppDao = database.monitoredAppDao()
+
+    @Provides
+    fun provideWeeklyHistoryDao(database: AppDatabase): WeeklyHistoryDao = database.weeklyHistoryDao()
 }

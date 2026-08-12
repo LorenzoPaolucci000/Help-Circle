@@ -34,26 +34,12 @@ class AgencyRepositoryImpl @Inject constructor(
 
     override suspend fun updateAgencyIndex(index: AgencyIndex) {
         val current = agencyStateDao.observe().firstOrNull()
-        agencyStateDao.upsert(
-            AgencyStateEntity(
-                agencyIndexValue = index.value,
-                agencyState = current?.agencyState ?: AgencyState.Stable.toStorageName(),
-                deltaAutonomy = current?.deltaAutonomy ?: 0,
-                deltaSupport = current?.deltaSupport ?: 0
-            )
-        )
+        agencyStateDao.upsert(current.withDefaults().copy(agencyIndexValue = index.value))
     }
 
     override suspend fun reportAgencyState(state: AgencyState) {
         val current = agencyStateDao.observe().firstOrNull()
-        agencyStateDao.upsert(
-            AgencyStateEntity(
-                agencyIndexValue = current?.agencyIndexValue ?: AgencyIndex.BASELINE,
-                agencyState = state.toStorageName(),
-                deltaAutonomy = current?.deltaAutonomy ?: 0,
-                deltaSupport = current?.deltaSupport ?: 0
-            )
-        )
+        agencyStateDao.upsert(current.withDefaults().copy(agencyState = state.toStorageName()))
     }
 
     override suspend fun adjustAgencyDeltas(deltaAutonomy: Int, deltaSupport: Int): AgencyIndex {
@@ -62,15 +48,43 @@ class AgencyRepositoryImpl @Inject constructor(
         val newDeltaSupport = (current?.deltaSupport ?: 0) + deltaSupport
         val index = AgencyIndex.calculate(newDeltaAutonomy, newDeltaSupport)
         agencyStateDao.upsert(
-            AgencyStateEntity(
+            current.withDefaults().copy(
                 agencyIndexValue = index.value,
-                agencyState = current?.agencyState ?: AgencyState.Stable.toStorageName(),
                 deltaAutonomy = newDeltaAutonomy,
                 deltaSupport = newDeltaSupport
             )
         )
         return index
     }
+
+    override suspend fun getLastArchivedAgencyIndex(): Int? =
+        agencyStateDao.observe().firstOrNull()?.lastArchivedAgencyIndexValue
+
+    override suspend fun archiveAgencyIndex(agencyIndexValue: Int) {
+        val current = agencyStateDao.observe().firstOrNull()
+        agencyStateDao.upsert(current.withDefaults().copy(lastArchivedAgencyIndexValue = agencyIndexValue))
+    }
+
+    override suspend fun getLastWeeklyResetAtEpochMillis(): Long? =
+        agencyStateDao.observe().firstOrNull()?.lastWeeklyResetAtEpochMillis
+
+    override suspend fun resetAgencyIndexForNewWeek(atEpochMillis: Long) {
+        val current = agencyStateDao.observe().firstOrNull()
+        agencyStateDao.upsert(
+            current.withDefaults().copy(
+                agencyIndexValue = AgencyIndex.BASELINE,
+                deltaAutonomy = 0,
+                deltaSupport = 0,
+                lastWeeklyResetAtEpochMillis = atEpochMillis
+            )
+        )
+    }
+
+    /** Fills in a fresh row's defaults so every upsert site can just `.copy()` the fields it actually changes. */
+    private fun AgencyStateEntity?.withDefaults(): AgencyStateEntity = this ?: AgencyStateEntity(
+        agencyIndexValue = AgencyIndex.BASELINE,
+        agencyState = AgencyState.Stable.toStorageName()
+    )
 }
 
 private fun AgencyState.toStorageName(): String = when (this) {

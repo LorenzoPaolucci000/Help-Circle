@@ -5,12 +5,14 @@ import com.project.helpcircle.data.repository.CommunityRepositoryImpl
 import com.project.helpcircle.data.repository.MonitoredAppsRepositoryImpl
 import com.project.helpcircle.data.repository.NudgeRepositoryImpl
 import com.project.helpcircle.data.repository.UserRepositoryImpl
+import com.project.helpcircle.data.repository.WeeklyHistoryRepositoryImpl
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.InstalledAppsRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
+import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
 import com.project.helpcircle.os.InstalledAppsRepositoryImpl
 import dagger.Binds
 import dagger.Module
@@ -39,4 +41,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository
+
+    @Binds
+    abstract fun bindWeeklyHistoryRepository(impl: WeeklyHistoryRepositoryImpl): WeeklyHistoryRepository
 }

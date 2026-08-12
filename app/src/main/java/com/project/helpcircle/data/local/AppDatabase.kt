@@ -10,12 +10,15 @@ import com.project.helpcircle.data.local.dao.ChargeWalletDao
 import com.project.helpcircle.data.local.dao.FocusSessionDao
 import com.project.helpcircle.data.local.dao.MonitoredAppDao
 import com.project.helpcircle.data.local.dao.UserIdentityDao
+import com.project.helpcircle.data.local.dao.WeeklyHistoryDao
 import com.project.helpcircle.data.local.entity.ActiveCommunityEntity
 import com.project.helpcircle.data.local.entity.AgencyStateEntity
 import com.project.helpcircle.data.local.entity.ChargeWalletEntity
+import com.project.helpcircle.data.local.entity.CrisisEpisodeEntity
 import com.project.helpcircle.data.local.entity.FocusSessionEntity
 import com.project.helpcircle.data.local.entity.MonitoredAppEntity
 import com.project.helpcircle.data.local.entity.UserIdentityEntity
+import com.project.helpcircle.data.local.entity.WeeklySummaryEntity
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 /** The app's single local database, encrypted at rest via SQLCipher's [SupportOpenHelperFactory]. */
@@ -26,9 +29,11 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         UserIdentityEntity::class,
         AgencyStateEntity::class,
         ActiveCommunityEntity::class,
-        MonitoredAppEntity::class
+        MonitoredAppEntity::class,
+        CrisisEpisodeEntity::class,
+        WeeklySummaryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -38,6 +43,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun agencyStateDao(): AgencyStateDao
     abstract fun activeCommunityDao(): ActiveCommunityDao
     abstract fun monitoredAppDao(): MonitoredAppDao
+    abstract fun weeklyHistoryDao(): WeeklyHistoryDao
 
     companion object {
         private const val DATABASE_NAME = "help_circle.db"
