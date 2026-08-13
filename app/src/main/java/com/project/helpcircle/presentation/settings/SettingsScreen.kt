@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +22,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -33,16 +36,26 @@ import com.project.helpcircle.domain.model.AppInfo
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onLeftCommunity: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    LaunchedEffect(uiState.hasLeftCommunity) {
+        if (uiState.hasLeftCommunity) {
+            viewModel.onLeftCommunityHandled()
+            onLeftCommunity()
+        }
+    }
     SettingsContent(
         uiState = uiState,
         onBack = onBack,
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onAppToggled = viewModel::onAppToggled,
         onSaveClicked = viewModel::onSaveClicked,
+        onLeaveCommunityClicked = viewModel::onLeaveCommunityClicked,
+        onLeaveCommunityDismissed = viewModel::onLeaveCommunityDismissed,
+        onLeaveCommunityConfirmed = viewModel::onLeaveCommunityConfirmed,
         modifier = modifier
     )
 }
@@ -54,8 +67,32 @@ private fun SettingsContent(
     onSearchQueryChanged: (String) -> Unit,
     onAppToggled: (String) -> Unit,
     onSaveClicked: () -> Unit,
+    onLeaveCommunityClicked: () -> Unit,
+    onLeaveCommunityDismissed: () -> Unit,
+    onLeaveCommunityConfirmed: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (uiState.showLeaveConfirmation) {
+        AlertDialog(
+            onDismissRequest = onLeaveCommunityDismissed,
+            title = { Text("Leave this circle?") },
+            text = { Text("You'll stop seeing this circle's members and it'll stop seeing you. This can't be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = onLeaveCommunityConfirmed,
+                    enabled = !uiState.isLeavingCommunity,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Leave")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onLeaveCommunityDismissed, enabled = !uiState.isLeavingCommunity) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("Back") }
@@ -119,6 +156,13 @@ private fun SettingsContent(
             } else {
                 Text("Save configuration")
             }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        TextButton(
+            onClick = onLeaveCommunityClicked,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Leave this circle", color = MaterialTheme.colorScheme.error)
         }
     }
 }

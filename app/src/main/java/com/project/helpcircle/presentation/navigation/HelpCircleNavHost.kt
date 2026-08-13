@@ -61,7 +61,14 @@ fun HelpCircleNavHost(
             )
         }
         composable(Destination.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onLeftCommunity = {
+                    navController.navigate(Destination.JoinCommunity.route) {
+                        popUpTo(Destination.CommunityDashboard.route) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }

@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.helpcircle.domain.model.AppCategory
 import com.project.helpcircle.domain.model.AppInfo
+import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase
+import com.project.helpcircle.domain.usecase.LeaveCommunityUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +24,10 @@ data class SettingsUiState(
     val pendingMonitoredPackageNames: Set<String> = emptySet(),
     val searchQuery: String = "",
     val isSaving: Boolean = false,
-    val saveMessage: String? = null
+    val saveMessage: String? = null,
+    val showLeaveConfirmation: Boolean = false,
+    val isLeavingCommunity: Boolean = false,
+    val hasLeftCommunity: Boolean = false
 ) {
     /** Apps matching [searchQuery], grouped by [AppCategory] for the settings list. */
     val appsByCategory: Map<AppCategory, List<AppInfo>>
@@ -34,7 +39,9 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val getInstalledApps: GetInstalledAppsUseCase,
-    private val monitoredAppsRepository: MonitoredAppsRepository
+    private val monitoredAppsRepository: MonitoredAppsRepository,
+    private val communityRepository: CommunityRepository,
+    private val leaveCommunity: LeaveCommunityUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -85,5 +92,30 @@ class SettingsViewModel @Inject constructor(
             savedMonitoredPackageNames = pending
             _uiState.update { it.copy(isSaving = false, saveMessage = "Configuration saved") }
         }
+    }
+
+    fun onLeaveCommunityClicked() {
+        _uiState.update { it.copy(showLeaveConfirmation = true) }
+    }
+
+    fun onLeaveCommunityDismissed() {
+        _uiState.update { it.copy(showLeaveConfirmation = false) }
+    }
+
+    fun onLeaveCommunityConfirmed() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLeavingCommunity = true) }
+            val communityId = communityRepository.getActiveCommunityId()
+            if (communityId != null) {
+                leaveCommunity(communityId)
+            }
+            _uiState.update {
+                it.copy(isLeavingCommunity = false, showLeaveConfirmation = false, hasLeftCommunity = true)
+            }
+        }
+    }
+
+    fun onLeftCommunityHandled() {
+        _uiState.update { it.copy(hasLeftCommunity = false) }
     }
 }
