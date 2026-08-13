@@ -14,8 +14,17 @@ class ForegroundAppTracker {
     var lastBlacklistedForegroundAtMillis: Long? = null
         private set
 
+    /**
+     * Whether the app currently in the foreground is on the user's monitored-apps blacklist.
+     * Defaults to false (not monitored) until the first foreground-app change is observed, so
+     * doomscroll detection stays off rather than assuming every app is monitored during that gap.
+     */
+    var isCurrentForegroundAppBlacklisted: Boolean = false
+        private set
+
     fun onForegroundPackageChanged(packageName: String, atEpochMillis: Long, isBlacklisted: Boolean) {
         currentPackageName = packageName
+        isCurrentForegroundAppBlacklisted = isBlacklisted
         if (isBlacklisted) {
             lastBlacklistedForegroundAtMillis = atEpochMillis
         }

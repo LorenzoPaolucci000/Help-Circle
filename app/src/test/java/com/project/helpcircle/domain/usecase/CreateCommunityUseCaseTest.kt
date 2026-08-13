@@ -2,10 +2,12 @@ package com.project.helpcircle.domain.usecase
 
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,15 +33,39 @@ private class CreateCommunityFakeRepository : CommunityRepository {
     override suspend fun getMemberCount(communityId: String): Int = 0
 }
 
+private class CreateCommunityFakeMonitoredAppsRepository(
+    monitoredPackageNames: Set<String> = setOf("com.example.social")
+) : MonitoredAppsRepository {
+    override val monitoredPackageNames: Flow<Set<String>> = flowOf(monitoredPackageNames)
+    override suspend fun setMonitored(packageName: String, isMonitored: Boolean) = Unit
+    override suspend fun isMonitored(packageName: String): Boolean = false
+}
+
 class CreateCommunityUseCaseTest {
 
     @Test
     fun `creates a community with a freshly generated 6-character invite code`() = runBlocking {
         val repository = CreateCommunityFakeRepository()
 
-        val state = CreateCommunityUseCase(repository)()
+        val state = CreateCommunityUseCase(repository, CreateCommunityFakeMonitoredAppsRepository())()
 
         assertEquals(repository.lastCreatedInviteCode, state.inviteCode)
         assertTrue(state.inviteCode.matches(Regex("^[A-Z0-9]{6}$")))
+    }
+
+    @Test
+    fun `fails with no monitored apps before ever creating a community`() = runBlocking {
+        val repository = CreateCommunityFakeRepository()
+        val monitoredAppsRepository = CreateCommunityFakeMonitoredAppsRepository(monitoredPackageNames = emptySet())
+
+        val exception = try {
+            CreateCommunityUseCase(repository, monitoredAppsRepository)()
+            null
+        } catch (e: IllegalStateException) {
+            e
+        }
+
+        assertEquals("Add at least one app to monitor first", exception?.message)
+        assertNull(repository.lastCreatedInviteCode)
     }
 }

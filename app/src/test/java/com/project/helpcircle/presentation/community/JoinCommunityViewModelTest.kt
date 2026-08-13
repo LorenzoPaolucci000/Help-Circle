@@ -2,12 +2,14 @@ package com.project.helpcircle.presentation.community
 
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -44,9 +46,20 @@ private class JoinCommunityFakeRepository(
     override suspend fun getMemberCount(communityId: String): Int = 0
 }
 
-private fun viewModel(repository: CommunityRepository) = JoinCommunityViewModel(
-    JoinCommunityByInviteCodeUseCase(repository),
-    CreateCommunityUseCase(repository)
+private class JoinCommunityFakeMonitoredAppsRepository(
+    monitoredPackageNames: Set<String> = setOf("com.example.social")
+) : MonitoredAppsRepository {
+    override val monitoredPackageNames: Flow<Set<String>> = flowOf(monitoredPackageNames)
+    override suspend fun setMonitored(packageName: String, isMonitored: Boolean) = Unit
+    override suspend fun isMonitored(packageName: String): Boolean = false
+}
+
+private fun viewModel(
+    repository: CommunityRepository,
+    monitoredAppsRepository: MonitoredAppsRepository = JoinCommunityFakeMonitoredAppsRepository()
+) = JoinCommunityViewModel(
+    JoinCommunityByInviteCodeUseCase(repository, monitoredAppsRepository),
+    CreateCommunityUseCase(repository, monitoredAppsRepository)
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)

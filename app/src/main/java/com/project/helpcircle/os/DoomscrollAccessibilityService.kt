@@ -22,17 +22,20 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 /**
- * Passive accessibility boundary: observes system-wide scroll/tap events and turns each one into
- * a [ScrollSignal] for [DetectLossOfAgencyUseCase]. Reads only the event's type and a local
- * timestamp — never window content, on-screen text, or which app it came from beyond filtering
- * out this app's own UI — so raw usage data never leaves this boundary, per the Zero-PII rule.
- * Event coalescing is left to the framework's `notificationTimeout` (see the service's
- * accessibility config) rather than custom throttling here.
+ * Passive accessibility boundary: observes scroll/tap events in apps on the user's monitored-apps
+ * blacklist and turns each one into a [ScrollSignal] for [DetectLossOfAgencyUseCase]. Reads only
+ * the event's type and a local timestamp — never window content or on-screen text — so raw usage
+ * data never leaves this boundary, per the Zero-PII rule. Event coalescing is left to the
+ * framework's `notificationTimeout` (see the service's accessibility config) rather than custom
+ * throttling here.
  *
  * Also watches TYPE_WINDOW_STATE_CHANGED to know which app is in the foreground, checking each
  * transition against the user's own opt-in [MonitoredAppsRepository] blacklist and recording the
  * result on [ForegroundAppTracker] — only the package name of an app the user explicitly chose to
- * monitor is ever inspected this way, never a system-wide scan.
+ * monitor is ever inspected this way, never a system-wide scan. That same recorded result is what
+ * scopes crisis detection itself: scroll/tap events are only processed while
+ * [ForegroundAppTracker.isCurrentForegroundAppBlacklisted] is true, so an empty blacklist means
+ * nothing is watched at all.
  *
  * Runs itself as a foreground service with a silent, persistent notification so aggressive OEM
  * battery managers are less likely to kill it while it's the only thing keeping the doomscroll
@@ -113,6 +116,10 @@ class DoomscrollAccessibilityService : AccessibilityService() {
         if (event == null || event.packageName == packageName) return
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_SCROLLED, AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+                // Only scroll/tap activity in an app the user opted to monitor should ever feed
+                // crisis detection; an empty blacklist means nothing is being watched, per
+                // ForegroundAppTracker's default-false state before any foreground app is known.
+                if (!foregroundAppTracker.isCurrentForegroundAppBlacklisted) return
                 val signal = ScrollSignal(timestampMillis = System.currentTimeMillis())
                 serviceScope.launch {
                     val result = detectLossOfAgencyUseCase(signal)

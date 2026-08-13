@@ -7,6 +7,7 @@ import com.project.helpcircle.domain.engine.SystemFallbackEvaluator
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.InstalledAppsRepository
+import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
@@ -124,18 +125,22 @@ object UseCaseModule {
 
     @Provides
     fun provideJoinCommunityUseCase(
-        communityRepository: CommunityRepository
-    ): JoinCommunityUseCase = JoinCommunityUseCase(communityRepository)
+        communityRepository: CommunityRepository,
+        monitoredAppsRepository: MonitoredAppsRepository
+    ): JoinCommunityUseCase = JoinCommunityUseCase(communityRepository, monitoredAppsRepository)
 
     @Provides
     fun provideCreateCommunityUseCase(
-        communityRepository: CommunityRepository
-    ): CreateCommunityUseCase = CreateCommunityUseCase(communityRepository)
+        communityRepository: CommunityRepository,
+        monitoredAppsRepository: MonitoredAppsRepository
+    ): CreateCommunityUseCase = CreateCommunityUseCase(communityRepository, monitoredAppsRepository)
 
     @Provides
     fun provideJoinCommunityByInviteCodeUseCase(
-        communityRepository: CommunityRepository
-    ): JoinCommunityByInviteCodeUseCase = JoinCommunityByInviteCodeUseCase(communityRepository)
+        communityRepository: CommunityRepository,
+        monitoredAppsRepository: MonitoredAppsRepository
+    ): JoinCommunityByInviteCodeUseCase =
+        JoinCommunityByInviteCodeUseCase(communityRepository, monitoredAppsRepository)
 
     @Provides
     fun provideLeaveCommunityUseCase(

@@ -2,6 +2,7 @@ package com.project.helpcircle.domain.usecase
 
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -39,13 +40,21 @@ private class JoinByInviteCodeFakeRepository(
     override suspend fun getMemberCount(communityId: String): Int = 0
 }
 
+private class JoinByInviteCodeFakeMonitoredAppsRepository(
+    monitoredPackageNames: Set<String> = setOf("com.example.social")
+) : MonitoredAppsRepository {
+    override val monitoredPackageNames: Flow<Set<String>> = flowOf(monitoredPackageNames)
+    override suspend fun setMonitored(packageName: String, isMonitored: Boolean) = Unit
+    override suspend fun isMonitored(packageName: String): Boolean = false
+}
+
 class JoinCommunityByInviteCodeUseCaseTest {
 
     @Test
     fun `normalizes the code to uppercase with no surrounding whitespace before looking it up`() = runBlocking {
         val repository = JoinByInviteCodeFakeRepository(matchingCode = "AB12CD")
 
-        JoinCommunityByInviteCodeUseCase(repository)("  ab12cd  ")
+        JoinCommunityByInviteCodeUseCase(repository, JoinByInviteCodeFakeMonitoredAppsRepository())("  ab12cd  ")
 
         assertEquals("AB12CD", repository.lastLookedUpInviteCode)
     }
@@ -54,7 +63,7 @@ class JoinCommunityByInviteCodeUseCaseTest {
     fun `returns the joined community state on a matching code`() = runBlocking {
         val repository = JoinByInviteCodeFakeRepository(matchingCode = "AB12CD")
 
-        val state = JoinCommunityByInviteCodeUseCase(repository)("AB12CD")
+        val state = JoinCommunityByInviteCodeUseCase(repository, JoinByInviteCodeFakeMonitoredAppsRepository())("AB12CD")
 
         assertEquals("matched-id", state?.communityId)
     }
@@ -63,8 +72,24 @@ class JoinCommunityByInviteCodeUseCaseTest {
     fun `returns null when no community has that code`() = runBlocking {
         val repository = JoinByInviteCodeFakeRepository(matchingCode = "AB12CD")
 
-        val state = JoinCommunityByInviteCodeUseCase(repository)("ZZ99ZZ")
+        val state = JoinCommunityByInviteCodeUseCase(repository, JoinByInviteCodeFakeMonitoredAppsRepository())("ZZ99ZZ")
 
         assertNull(state)
+    }
+
+    @Test
+    fun `fails with no monitored apps before ever looking up the code`() = runBlocking {
+        val repository = JoinByInviteCodeFakeRepository(matchingCode = "AB12CD")
+        val monitoredAppsRepository = JoinByInviteCodeFakeMonitoredAppsRepository(monitoredPackageNames = emptySet())
+
+        val exception = try {
+            JoinCommunityByInviteCodeUseCase(repository, monitoredAppsRepository)("AB12CD")
+            null
+        } catch (e: IllegalStateException) {
+            e
+        }
+
+        assertEquals("Add at least one app to monitor first", exception?.message)
+        assertNull(repository.lastLookedUpInviteCode)
     }
 }
