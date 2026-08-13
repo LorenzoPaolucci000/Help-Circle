@@ -30,12 +30,15 @@ private class JoinCommunityFakeRepository(
     override suspend fun joinCommunity(communityId: String): CommunityState = throw UnsupportedOperationException()
 
     override suspend fun createCommunity(inviteCode: String): CommunityState {
-        if (createThrows) throw IllegalStateException("boom")
+        // A plain RuntimeException here, deliberately not IllegalStateException, so this stays
+        // distinct from the use case's own blacklist-check failure and correctly exercises the
+        // ViewModel's generic-exception fallback path rather than colliding with it.
+        if (createThrows) throw RuntimeException("boom")
         return createResult
     }
 
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? {
-        if (joinThrows) throw IllegalStateException("boom")
+        if (joinThrows) throw RuntimeException("boom")
         return joinResult
     }
 
@@ -59,7 +62,8 @@ private fun viewModel(
     monitoredAppsRepository: MonitoredAppsRepository = JoinCommunityFakeMonitoredAppsRepository()
 ) = JoinCommunityViewModel(
     JoinCommunityByInviteCodeUseCase(repository, monitoredAppsRepository),
-    CreateCommunityUseCase(repository, monitoredAppsRepository)
+    CreateCommunityUseCase(repository, monitoredAppsRepository),
+    monitoredAppsRepository
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -166,5 +170,53 @@ class JoinCommunityViewModelTest {
         viewModel.onContinueAfterCreateClicked()
 
         assertTrue(viewModel.uiState.value.hasJoined)
+    }
+
+    @Test
+    fun `hasMonitoredApps reflects an empty blacklist`() {
+        val viewModel = viewModel(
+            JoinCommunityFakeRepository(),
+            monitoredAppsRepository = JoinCommunityFakeMonitoredAppsRepository(emptySet())
+        )
+
+        assertEquals(false, viewModel.uiState.value.hasMonitoredApps)
+    }
+
+    @Test
+    fun `hasMonitoredApps reflects a non-empty blacklist`() {
+        val viewModel = viewModel(
+            JoinCommunityFakeRepository(),
+            monitoredAppsRepository = JoinCommunityFakeMonitoredAppsRepository(setOf("com.example.social"))
+        )
+
+        assertEquals(true, viewModel.uiState.value.hasMonitoredApps)
+    }
+
+    @Test
+    fun `joining with no monitored apps surfaces the use case's blacklist error`() {
+        val matched = CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, inviteCode = "AB12CD")
+        val viewModel = viewModel(
+            JoinCommunityFakeRepository(joinResult = matched),
+            monitoredAppsRepository = JoinCommunityFakeMonitoredAppsRepository(emptySet())
+        )
+        viewModel.onInviteCodeInputChanged("AB12CD")
+
+        viewModel.onJoinClicked()
+
+        assertEquals("Add at least one app to monitor first", viewModel.uiState.value.joinError)
+        assertEquals(false, viewModel.uiState.value.hasJoined)
+    }
+
+    @Test
+    fun `creating with no monitored apps surfaces the use case's blacklist error`() {
+        val viewModel = viewModel(
+            JoinCommunityFakeRepository(),
+            monitoredAppsRepository = JoinCommunityFakeMonitoredAppsRepository(emptySet())
+        )
+
+        viewModel.onCreateClicked()
+
+        assertEquals("Add at least one app to monitor first", viewModel.uiState.value.createError)
+        assertNull(viewModel.uiState.value.createdInviteCode)
     }
 }

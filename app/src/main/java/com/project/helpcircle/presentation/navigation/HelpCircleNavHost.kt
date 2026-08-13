@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.community.JoinCommunityScreen
 import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
+import com.project.helpcircle.presentation.onboarding.SelectMonitoredAppsScreen
 import com.project.helpcircle.presentation.startup.StartupDestination
 import com.project.helpcircle.presentation.startup.StartupScreen
 
@@ -38,8 +39,25 @@ fun HelpCircleNavHost(
         composable(Destination.NicknameSetup.route) {
             NicknameSetupScreen(
                 onNicknameSaved = {
-                    navController.navigate(Destination.JoinCommunity.route) {
+                    navController.navigate(Destination.SelectMonitoredApps.route) {
                         popUpTo(Destination.NicknameSetup.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(Destination.SelectMonitoredApps.route) {
+            SelectMonitoredAppsScreen(
+                onContinue = {
+                    // Reached either from onboarding (NicknameSetup already popped away, nothing
+                    // to return to) or from JoinCommunityScreen's "Go to Settings" banner (pushed
+                    // on top, still sitting right below). In the latter case just pop back to that
+                    // existing instance instead of pushing a second one on top of it.
+                    if (navController.previousBackStackEntry?.destination?.route == Destination.JoinCommunity.route) {
+                        navController.popBackStack()
+                    } else {
+                        navController.navigate(Destination.JoinCommunity.route) {
+                            popUpTo(Destination.SelectMonitoredApps.route) { inclusive = true }
+                        }
                     }
                 }
             )
@@ -50,6 +68,9 @@ fun HelpCircleNavHost(
                     navController.navigate(Destination.MainTabs.route) {
                         popUpTo(Destination.JoinCommunity.route) { inclusive = true }
                     }
+                },
+                onGoToMonitoredApps = {
+                    navController.navigate(Destination.SelectMonitoredApps.route)
                 }
             )
         }

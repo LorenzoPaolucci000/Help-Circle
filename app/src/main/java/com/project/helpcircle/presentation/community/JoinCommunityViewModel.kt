@@ -2,6 +2,7 @@ package com.project.helpcircle.presentation.community
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,6 +10,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,17 +26,27 @@ data class JoinCommunityUiState(
     val isCreating: Boolean = false,
     val createError: String? = null,
     val createdInviteCode: String? = null,
-    val hasJoined: Boolean = false
+    val hasJoined: Boolean = false,
+    // Optimistic default so the blocking banner doesn't flash on screen before the first read of
+    // the (fast, Room-backed) blacklist actually completes.
+    val hasMonitoredApps: Boolean = true
 )
 
 @HiltViewModel
 class JoinCommunityViewModel @Inject constructor(
     private val joinCommunityByInviteCode: JoinCommunityByInviteCodeUseCase,
-    private val createCommunity: CreateCommunityUseCase
+    private val createCommunity: CreateCommunityUseCase,
+    monitoredAppsRepository: MonitoredAppsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(JoinCommunityUiState())
     val uiState: StateFlow<JoinCommunityUiState> = _uiState.asStateFlow()
+
+    init {
+        monitoredAppsRepository.monitoredPackageNames
+            .onEach { monitored -> _uiState.update { it.copy(hasMonitoredApps = monitored.isNotEmpty()) } }
+            .launchIn(viewModelScope)
+    }
 
     fun onTabSelected(tab: JoinCommunityTab) {
         _uiState.update { it.copy(selectedTab = tab) }
@@ -57,6 +70,11 @@ class JoinCommunityViewModel @Inject constructor(
                 }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: IllegalStateException) {
+                // Defensive fallback: the live hasMonitoredApps observation above should already
+                // keep the join/create actions hidden behind the banner before this can fire, but
+                // the use case's own check() is the actual source of truth if that ever races.
+                _uiState.update { it.copy(isJoining = false, joinError = e.message) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isJoining = false, joinError = "Couldn't join that circle. Try again.")
@@ -73,6 +91,8 @@ class JoinCommunityViewModel @Inject constructor(
                 _uiState.update { it.copy(isCreating = false, createdInviteCode = state.inviteCode) }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: IllegalStateException) {
+                _uiState.update { it.copy(isCreating = false, createError = e.message) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isCreating = false, createError = "Couldn't create a circle. Try again.")

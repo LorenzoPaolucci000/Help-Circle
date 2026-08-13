@@ -1,5 +1,6 @@
 package com.project.helpcircle.presentation.community
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,11 +28,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.project.helpcircle.presentation.common.MonitoredAppsRequiredBanner
 
 /** Entry point: hoists [JoinCommunityViewModel] state and hands it to the stateless content below. */
 @Composable
 fun JoinCommunityScreen(
     onJoined: () -> Unit,
+    onGoToMonitoredApps: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: JoinCommunityViewModel = hiltViewModel()
 ) {
@@ -48,6 +51,7 @@ fun JoinCommunityScreen(
         onJoinClicked = viewModel::onJoinClicked,
         onCreateClicked = viewModel::onCreateClicked,
         onContinueAfterCreateClicked = viewModel::onContinueAfterCreateClicked,
+        onGoToMonitoredApps = onGoToMonitoredApps,
         modifier = modifier
     )
 }
@@ -60,8 +64,18 @@ private fun JoinCommunityContent(
     onJoinClicked: () -> Unit,
     onCreateClicked: () -> Unit,
     onContinueAfterCreateClicked: () -> Unit,
+    onGoToMonitoredApps: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (!uiState.hasMonitoredApps) {
+        Box(modifier = modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            MonitoredAppsRequiredBanner(
+                actionLabel = "Go to Settings",
+                onActionClicked = onGoToMonitoredApps
+            )
+        }
+        return
+    }
     Column(modifier = modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = uiState.selectedTab.ordinal) {
             Tab(
