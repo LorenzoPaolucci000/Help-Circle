@@ -49,14 +49,12 @@ import kotlinx.coroutines.delay
 /** Entry point: hoists [CommunityDashboardViewModel] state and hands it to the stateless content below. */
 @Composable
 fun CommunityDashboardScreen(
-    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CommunityDashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     CommunityDashboardContent(
         uiState = uiState,
-        onOpenSettings = onOpenSettings,
         onMemberClicked = viewModel::onMemberClicked,
         onNudgePickerDismissed = viewModel::onNudgePickerDismissed,
         onNudgeSelected = viewModel::onNudgeSelected,
@@ -68,7 +66,6 @@ fun CommunityDashboardScreen(
 @Composable
 private fun CommunityDashboardContent(
     uiState: CommunityDashboardUiState,
-    onOpenSettings: () -> Unit,
     onMemberClicked: (CommunityMember) -> Unit,
     onNudgePickerDismissed: () -> Unit,
     onNudgeSelected: (Nudge) -> Unit,
@@ -77,10 +74,6 @@ private fun CommunityDashboardContent(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         LivingLandscapeBackground(landscape = uiState.visualLandscape, modifier = Modifier.fillMaxSize())
-
-        TextButton(onClick = onOpenSettings, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-            Text("Settings")
-        }
 
         when {
             uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))

@@ -6,10 +6,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.project.helpcircle.presentation.community.CommunityDashboardScreen
 import com.project.helpcircle.presentation.community.JoinCommunityScreen
 import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
-import com.project.helpcircle.presentation.settings.SettingsScreen
 import com.project.helpcircle.presentation.startup.StartupDestination
 import com.project.helpcircle.presentation.startup.StartupScreen
 
@@ -29,7 +27,7 @@ fun HelpCircleNavHost(
                     val route = when (destination) {
                         StartupDestination.NICKNAME_SETUP -> Destination.NicknameSetup.route
                         StartupDestination.JOIN_COMMUNITY -> Destination.JoinCommunity.route
-                        StartupDestination.COMMUNITY_DASHBOARD -> Destination.CommunityDashboard.route
+                        StartupDestination.COMMUNITY_DASHBOARD -> Destination.MainTabs.route
                     }
                     navController.navigate(route) {
                         popUpTo(Destination.Startup.route) { inclusive = true }
@@ -49,23 +47,17 @@ fun HelpCircleNavHost(
         composable(Destination.JoinCommunity.route) {
             JoinCommunityScreen(
                 onJoined = {
-                    navController.navigate(Destination.CommunityDashboard.route) {
+                    navController.navigate(Destination.MainTabs.route) {
                         popUpTo(Destination.JoinCommunity.route) { inclusive = true }
                     }
                 }
             )
         }
-        composable(Destination.CommunityDashboard.route) {
-            CommunityDashboardScreen(
-                onOpenSettings = { navController.navigate(Destination.Settings.route) }
-            )
-        }
-        composable(Destination.Settings.route) {
-            SettingsScreen(
-                onBack = { navController.popBackStack() },
+        composable(Destination.MainTabs.route) {
+            MainTabsScreen(
                 onLeftCommunity = {
                     navController.navigate(Destination.JoinCommunity.route) {
-                        popUpTo(Destination.CommunityDashboard.route) { inclusive = true }
+                        popUpTo(Destination.MainTabs.route) { inclusive = true }
                     }
                 }
             )

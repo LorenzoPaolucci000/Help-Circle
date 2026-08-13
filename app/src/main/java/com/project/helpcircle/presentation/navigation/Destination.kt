@@ -4,6 +4,7 @@ sealed class Destination(val route: String) {
     data object Startup : Destination("startup")
     data object NicknameSetup : Destination("nickname_setup")
     data object JoinCommunity : Destination("join_community")
-    data object CommunityDashboard : Destination("community_dashboard")
-    data object Settings : Destination("settings")
+
+    /** The bottom-nav-tabbed container hosting the Me/Community/Settings screens; see [TabDestination]. */
+    data object MainTabs : Destination("main_tabs")
 }

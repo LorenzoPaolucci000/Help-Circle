@@ -35,7 +35,6 @@ import com.project.helpcircle.domain.model.AppInfo
 /** Entry point: hoists [SettingsViewModel] state and hands it to the stateless content below. */
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
     onLeftCommunity: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -49,7 +48,6 @@ fun SettingsScreen(
     }
     SettingsContent(
         uiState = uiState,
-        onBack = onBack,
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onAppToggled = viewModel::onAppToggled,
         onSaveClicked = viewModel::onSaveClicked,
@@ -63,7 +61,6 @@ fun SettingsScreen(
 @Composable
 private fun SettingsContent(
     uiState: SettingsUiState,
-    onBack: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onAppToggled: (String) -> Unit,
     onSaveClicked: () -> Unit,
@@ -94,15 +91,7 @@ private fun SettingsContent(
         )
     }
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("Back") }
-            Spacer(modifier = Modifier.height(0.dp))
-            Text(
-                text = "Monitored apps",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        }
+        Text(text = "Monitored apps", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Choose which apps count toward doomscroll detection and focus mode.",

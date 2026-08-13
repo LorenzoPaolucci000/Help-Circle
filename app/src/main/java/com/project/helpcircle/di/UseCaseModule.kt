@@ -21,6 +21,7 @@ import com.project.helpcircle.domain.usecase.IsFocusModeActiveUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityUseCase
 import com.project.helpcircle.domain.usecase.LeaveCommunityUseCase
+import com.project.helpcircle.domain.usecase.ObserveAgencyHomeUseCase
 import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
@@ -101,6 +102,12 @@ object UseCaseModule {
         calculateAgencyIndexUseCase,
         weeklyHistoryRepository
     )
+
+    @Provides
+    fun provideObserveAgencyHomeUseCase(
+        agencyRepository: AgencyRepository,
+        weeklyHistoryRepository: WeeklyHistoryRepository
+    ): ObserveAgencyHomeUseCase = ObserveAgencyHomeUseCase(agencyRepository, weeklyHistoryRepository)
 
     @Provides
     fun provideObserveCommunityStateUseCase(
