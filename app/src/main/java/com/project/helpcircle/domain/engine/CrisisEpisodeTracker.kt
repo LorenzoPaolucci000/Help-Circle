@@ -43,6 +43,12 @@ class CrisisEpisodeTracker {
         }
     }
 
+    /** When the current crisis episode started, or null if none is open. Read-only; callers can't affect scoring through it. */
+    fun currentCrisisStartedAtMillis(): Long? = crisisStartedAtMillis
+
+    /** Whether a peer's nudge has already been delivered during the current crisis episode. */
+    fun hasReceivedNudgeThisEpisode(): Boolean = nudgeReceivedAtMillis != null
+
     /** Feeds a new [AgencyState] reading and returns any [AgencyDelta] this transition/tick earns. */
     fun onAgencyStateUpdated(state: AgencyState, atEpochMillis: Long): AgencyDelta {
         val wasInCrisis = crisisStartedAtMillis != null
