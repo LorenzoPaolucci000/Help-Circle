@@ -15,6 +15,7 @@ import com.project.helpcircle.domain.usecase.CalculateAgencyIndexUseCase
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
+import com.project.helpcircle.domain.usecase.EvaluateSystemFallbackUseCase
 import com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase
 import com.project.helpcircle.domain.usecase.IsFocusModeActiveUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
@@ -65,13 +66,27 @@ object UseCaseModule {
         agencyRepository: AgencyRepository,
         crisisEpisodeTracker: CrisisEpisodeTracker,
         calculateAgencyIndexUseCase: CalculateAgencyIndexUseCase,
-        weeklyHistoryRepository: WeeklyHistoryRepository
+        weeklyHistoryRepository: WeeklyHistoryRepository,
+        evaluateSystemFallbackUseCase: EvaluateSystemFallbackUseCase
     ): DetectLossOfAgencyUseCase = DetectLossOfAgencyUseCase(
         agencyDetectionEngine,
         agencyRepository,
         crisisEpisodeTracker,
         calculateAgencyIndexUseCase,
-        weeklyHistoryRepository
+        weeklyHistoryRepository,
+        evaluateSystemFallbackUseCase
+    )
+
+    @Provides
+    @Singleton
+    fun provideEvaluateSystemFallbackUseCase(
+        crisisEpisodeTracker: CrisisEpisodeTracker,
+        systemFallbackEvaluator: SystemFallbackEvaluator,
+        communityRepository: CommunityRepository
+    ): EvaluateSystemFallbackUseCase = EvaluateSystemFallbackUseCase(
+        crisisEpisodeTracker,
+        systemFallbackEvaluator,
+        communityRepository
     )
 
     @Provides

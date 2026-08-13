@@ -3,12 +3,15 @@ package com.project.helpcircle.domain.usecase
 import com.project.helpcircle.domain.engine.AgencyDetectionEngine
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.engine.ScrollSignal
+import com.project.helpcircle.domain.engine.SystemFallbackEvaluator
 import com.project.helpcircle.domain.model.AgencyIndex
 import com.project.helpcircle.domain.model.AgencyState
+import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.CrisisEpisodeRecord
 import com.project.helpcircle.domain.model.FocusSession
 import com.project.helpcircle.domain.model.WeeklySummary
 import com.project.helpcircle.domain.repository.AgencyRepository
+import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -63,17 +67,35 @@ private class DetectLossFakeWeeklyHistoryRepository : WeeklyHistoryRepository {
     override val weeklySummaries: Flow<List<WeeklySummary>> = summariesFlow
 }
 
+private class DetectLossFakeCommunityRepository(
+    private val activeCommunityId: String?,
+    private val memberCount: Int
+) : CommunityRepository {
+    override fun observeCommunityState(communityId: String): Flow<CommunityState> =
+        MutableStateFlow(CommunityState(communityId, emptyList(), cohesionBonusApplied = false))
+    override suspend fun joinCommunity(communityId: String): CommunityState = throw UnsupportedOperationException()
+    override suspend fun createCommunity(inviteCode: String): CommunityState = throw UnsupportedOperationException()
+    override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
+    override suspend fun reportCrisis(communityId: String) = Unit
+    override suspend fun reportRecovery(communityId: String) = Unit
+    override suspend fun leaveCommunity(communityId: String) = Unit
+    override suspend fun getActiveCommunityId(): String? = activeCommunityId
+    override suspend fun getMemberCount(communityId: String): Int = memberCount
+}
+
 private fun useCase(
     engine: AgencyDetectionEngine,
     agencyRepository: DetectLossFakeAgencyRepository,
     weeklyHistoryRepository: DetectLossFakeWeeklyHistoryRepository,
-    tracker: CrisisEpisodeTracker = CrisisEpisodeTracker()
+    tracker: CrisisEpisodeTracker = CrisisEpisodeTracker(),
+    communityRepository: CommunityRepository = DetectLossFakeCommunityRepository(activeCommunityId = "comm-1", memberCount = 2)
 ) = DetectLossOfAgencyUseCase(
     engine,
     agencyRepository,
     tracker,
     CalculateAgencyIndexUseCase(agencyRepository),
-    weeklyHistoryRepository
+    weeklyHistoryRepository,
+    EvaluateSystemFallbackUseCase(tracker, SystemFallbackEvaluator(tracker), communityRepository)
 )
 
 class DetectLossOfAgencyUseCaseTest {
@@ -84,9 +106,10 @@ class DetectLossOfAgencyUseCaseTest {
         val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
         val engine = AgencyDetectionEngine(scrollThreshold = 100, warningRatio = 0.6)
 
-        val state = useCase(engine, agencyRepository, weeklyHistoryRepository)(ScrollSignal(0))
+        val result = useCase(engine, agencyRepository, weeklyHistoryRepository)(ScrollSignal(0))
 
-        assertEquals(AgencyState.Stable, state)
+        assertEquals(AgencyState.Stable, result.state)
+        assertFalse(result.offerSystemFallback)
         assertEquals(AgencyState.Stable, agencyRepository.stateFlow.value)
         assertEquals(AgencyIndex.baseline(), agencyRepository.indexFlow.value)
         assertTrue(weeklyHistoryRepository.recordedEpisodes.isEmpty())
@@ -98,9 +121,9 @@ class DetectLossOfAgencyUseCaseTest {
         val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
         val engine = AgencyDetectionEngine(scrollThreshold = 1, warningRatio = 0.6)
 
-        val state = useCase(engine, agencyRepository, weeklyHistoryRepository)(ScrollSignal(0))
+        val result = useCase(engine, agencyRepository, weeklyHistoryRepository)(ScrollSignal(0))
 
-        assertEquals(AgencyState.Crisis, state)
+        assertEquals(AgencyState.Crisis, result.state)
         assertEquals(AgencyState.Crisis, agencyRepository.stateFlow.value)
         assertEquals(AgencyIndex.baseline(), agencyRepository.indexFlow.value)
         assertTrue(weeklyHistoryRepository.recordedEpisodes.isEmpty())
@@ -117,13 +140,43 @@ class DetectLossOfAgencyUseCaseTest {
         val detectLossOfAgency = useCase(engine, agencyRepository, weeklyHistoryRepository)
 
         detectLossOfAgency(ScrollSignal(0))
-        val crisisState = detectLossOfAgency(ScrollSignal(100))
-        val recoveredState = detectLossOfAgency(ScrollSignal(2_100))
+        val crisisResult = detectLossOfAgency(ScrollSignal(100))
+        val recoveredResult = detectLossOfAgency(ScrollSignal(2_100))
 
-        assertEquals(AgencyState.Crisis, crisisState)
-        assertEquals(AgencyState.Stable, recoveredState)
+        assertEquals(AgencyState.Crisis, crisisResult.state)
+        assertEquals(AgencyState.Stable, recoveredResult.state)
         assertEquals(55, agencyRepository.indexFlow.value.value)
         assertEquals(1, weeklyHistoryRepository.recordedEpisodes.size)
         assertEquals(100L, weeklyHistoryRepository.recordedEpisodes.single().startedAtEpochMillis)
+    }
+
+    @Test
+    fun `a crisis in a solo community offers the system fallback immediately`() = runBlocking {
+        val agencyRepository = DetectLossFakeAgencyRepository()
+        val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
+        val engine = AgencyDetectionEngine(scrollThreshold = 1, warningRatio = 0.6)
+        val communityRepository = DetectLossFakeCommunityRepository(activeCommunityId = "comm-1", memberCount = 1)
+
+        val result = useCase(
+            engine,
+            agencyRepository,
+            weeklyHistoryRepository,
+            communityRepository = communityRepository
+        )(ScrollSignal(0))
+
+        assertEquals(AgencyState.Crisis, result.state)
+        assertTrue(result.offerSystemFallback)
+    }
+
+    @Test
+    fun `a crisis in a populated community does not offer the fallback right away`() = runBlocking {
+        val agencyRepository = DetectLossFakeAgencyRepository()
+        val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
+        val engine = AgencyDetectionEngine(scrollThreshold = 1, warningRatio = 0.6)
+
+        val result = useCase(engine, agencyRepository, weeklyHistoryRepository)(ScrollSignal(0))
+
+        assertEquals(AgencyState.Crisis, result.state)
+        assertFalse(result.offerSystemFallback)
     }
 }
