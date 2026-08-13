@@ -13,10 +13,12 @@ import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
 import com.project.helpcircle.presentation.fallback.SystemFallbackActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 /**
@@ -68,7 +70,14 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var contentBlurInterventionController: ContentBlurInterventionController
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // A transient failure in any suspend call this service launches (most commonly a Firestore
+    // read/listener rejecting with PERMISSION_DENIED) must never crash this process — it's the
+    // one long-running component meant to survive exactly this kind of failure, not die and take
+    // doomscroll detection down with it. This is the scope-wide backstop; the nudge-listener Flow
+    // below also has its own explicit .catch{} since Flow exceptions need that, not this handler.
+    private val serviceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, _ -> }
+    )
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -77,7 +86,13 @@ class DoomscrollAccessibilityService : AccessibilityService() {
             notificationManager.buildMonitoringNotification()
         )
         serviceScope.launch {
-            nudgeRepository.incomingNudges.collect { nudge -> handleNudge(nudge) }
+            nudgeRepository.incomingNudges
+                // Same rationale as CommunityDashboardViewModel's identical guard: a rejected
+                // Firestore listener (e.g. a rules mismatch) must not crash this service — it's
+                // the one long-running component that's supposed to survive precisely this kind
+                // of transient failure, not die and take doomscroll detection down with it.
+                .catch { }
+                .collect { nudge -> handleNudge(nudge) }
         }
     }
 
