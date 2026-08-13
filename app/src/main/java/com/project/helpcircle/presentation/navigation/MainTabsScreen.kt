@@ -1,17 +1,13 @@
 package com.project.helpcircle.presentation.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -19,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.community.CommunityDashboardScreen
+import com.project.helpcircle.presentation.home.HomeScreen
 import com.project.helpcircle.presentation.settings.SettingsScreen
 
 /**
@@ -65,7 +62,7 @@ fun MainTabsScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(TabDestination.ME.route) {
-                MeTabPlaceholder()
+                HomeScreen()
             }
             composable(TabDestination.COMMUNITY.route) {
                 CommunityDashboardScreen()
@@ -74,13 +71,5 @@ fun MainTabsScreen(
                 SettingsScreen(onLeftCommunity = onLeftCommunity)
             }
         }
-    }
-}
-
-/** Stand-in for the "Me" tab's real content until the personal agency home screen is built. */
-@Composable
-private fun MeTabPlaceholder(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "Coming soon", style = MaterialTheme.typography.bodyMedium)
     }
 }

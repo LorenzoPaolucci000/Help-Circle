@@ -1,0 +1,141 @@
+package com.project.helpcircle.presentation.home
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.project.helpcircle.domain.model.WeeklySummary
+import kotlin.math.abs
+
+/** Entry point: hoists [HomeViewModel] state and hands it to the stateless content below. */
+@Composable
+fun HomeScreen(
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    HomeContent(uiState = uiState, modifier = modifier)
+}
+
+@Composable
+private fun HomeContent(uiState: HomeUiState, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize()) {
+        if (uiState.isLoading) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            return@Box
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
+            Spacer(modifier = Modifier.height(24.dp))
+            PersonalIndexDisplay(currentAgencyIndex = uiState.currentAgencyIndex)
+            Spacer(modifier = Modifier.height(40.dp))
+            WeeklyTrendChart(weeklyDeltasOldestFirst = uiState.weeklyDeltasOldestFirst)
+            Spacer(modifier = Modifier.height(32.dp))
+            LatestWeeklySummaryCard(summary = uiState.latestWeeklySummary)
+        }
+    }
+}
+
+/** Large, central IA_ind score — this device's own, never a peer's. */
+@Composable
+private fun PersonalIndexDisplay(currentAgencyIndex: Int, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = currentAgencyIndex.toString(),
+            fontSize = 96.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = "Your Agency Index",
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** A simple bar-per-week trend: bar height reflects that week's IA_ind delta magnitude, color reflects its sign. */
+@Composable
+private fun WeeklyTrendChart(weeklyDeltasOldestFirst: List<Int>, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = "Weekly trend", style = MaterialTheme.typography.titleSmall)
+        Spacer(modifier = Modifier.height(12.dp))
+        if (weeklyDeltasOldestFirst.isEmpty()) {
+            Text(
+                text = "No weekly history yet — check back after your first weekly reset.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                val maxMagnitude = weeklyDeltasOldestFirst.maxOf { abs(it) }.coerceAtLeast(1)
+                weeklyDeltasOldestFirst.forEach { delta ->
+                    val barHeight = (abs(delta).toFloat() / maxMagnitude * 52).coerceAtLeast(4f)
+                    Box(
+                        modifier = Modifier
+                            .width(16.dp)
+                            .height(barHeight.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (delta >= 0) Color(0xFF66BB6A) else Color(0xFFE57373))
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Recap of the most recently completed week: when crises peaked and which intervention helped most. */
+@Composable
+private fun LatestWeeklySummaryCard(summary: WeeklySummary?, modifier: Modifier = Modifier) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "Last week", style = MaterialTheme.typography.titleSmall)
+            Spacer(modifier = Modifier.height(8.dp))
+            if (summary == null) {
+                Text(
+                    text = "No weekly summary yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(text = "Peak crisis hour: ${summary.peakCrisisHour?.let { "$it:00" } ?: "No crises"}")
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = "Most effective intervention: ${summary.mostEffectiveInterventionCategory ?: "None"}")
+            }
+        }
+    }
+}
