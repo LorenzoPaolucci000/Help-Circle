@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
+import com.project.helpcircle.presentation.common.NETWORK_TIMEOUT_MILLIS
+import com.project.helpcircle.presentation.common.SLOW_CONNECTION_MESSAGE
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -19,9 +21,6 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 enum class JoinCommunityTab { JOIN, CREATE }
-
-private const val NETWORK_TIMEOUT_MILLIS = 15_000L
-private const val SLOW_CONNECTION_MESSAGE = "Connection is slow — tap to try again"
 
 data class JoinCommunityUiState(
     val selectedTab: JoinCommunityTab = JoinCommunityTab.JOIN,

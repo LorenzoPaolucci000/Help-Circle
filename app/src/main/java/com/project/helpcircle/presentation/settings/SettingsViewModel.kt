@@ -8,14 +8,19 @@ import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase
 import com.project.helpcircle.domain.usecase.LeaveCommunityUseCase
+import com.project.helpcircle.presentation.common.NETWORK_TIMEOUT_MILLIS
+import com.project.helpcircle.presentation.common.SLOW_CONNECTION_MESSAGE
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /** UI state for [SettingsScreen]: the device's installed apps, and which ones are pending inclusion on the monitored-apps blacklist. */
 data class SettingsUiState(
@@ -27,6 +32,8 @@ data class SettingsUiState(
     val saveMessage: String? = null,
     val showLeaveConfirmation: Boolean = false,
     val isLeavingCommunity: Boolean = false,
+    val leaveError: String? = null,
+    val leaveTimedOut: Boolean = false,
     val hasLeftCommunity: Boolean = false
 ) {
     /** Apps matching [searchQuery], grouped by [AppCategory] for the settings list. */
@@ -95,22 +102,41 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onLeaveCommunityClicked() {
-        _uiState.update { it.copy(showLeaveConfirmation = true) }
+        _uiState.update { it.copy(showLeaveConfirmation = true, leaveError = null, leaveTimedOut = false) }
     }
 
     fun onLeaveCommunityDismissed() {
-        _uiState.update { it.copy(showLeaveConfirmation = false) }
+        _uiState.update { it.copy(showLeaveConfirmation = false, leaveError = null, leaveTimedOut = false) }
     }
 
     fun onLeaveCommunityConfirmed() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLeavingCommunity = true) }
-            val communityId = communityRepository.getActiveCommunityId()
-            if (communityId != null) {
-                leaveCommunity(communityId)
-            }
-            _uiState.update {
-                it.copy(isLeavingCommunity = false, showLeaveConfirmation = false, hasLeftCommunity = true)
+            _uiState.update { it.copy(isLeavingCommunity = true, leaveError = null, leaveTimedOut = false) }
+            try {
+                withTimeout(NETWORK_TIMEOUT_MILLIS) {
+                    val communityId = communityRepository.getActiveCommunityId()
+                    if (communityId != null) {
+                        leaveCommunity(communityId)
+                    }
+                }
+                _uiState.update {
+                    it.copy(isLeavingCommunity = false, showLeaveConfirmation = false, hasLeftCommunity = true)
+                }
+            } catch (e: TimeoutCancellationException) {
+                // Safe to retry as-is: leaveCommunity() deletes the caller's own member doc and
+                // only decrements activeMembers if that doc still exists (see
+                // CommunityRepositoryImpl's transaction), so a retry that finds it already gone —
+                // because the timed-out attempt actually landed late in the background — just
+                // no-ops instead of double-decrementing.
+                _uiState.update {
+                    it.copy(isLeavingCommunity = false, leaveError = SLOW_CONNECTION_MESSAGE, leaveTimedOut = true)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isLeavingCommunity = false, leaveError = "Couldn't leave that circle. Try again.")
+                }
             }
         }
     }

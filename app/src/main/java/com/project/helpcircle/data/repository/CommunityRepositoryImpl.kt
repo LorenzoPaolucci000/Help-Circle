@@ -55,16 +55,42 @@ class CommunityRepositoryImpl @Inject constructor(
         }
 
     override suspend fun joinCommunity(communityId: String): CommunityState = retryingOnUnauthenticated {
+        val identity = userRepository.getOrCreateIdentity()
+        val agencyScore = agencyRepository.currentAgencyIndex.first().value
         val doc = communityDoc(communityId)
-        doc.set(
-            mapOf(
-                FIELD_ACTIVE_MEMBERS to FieldValue.increment(1),
-                FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
-            ),
-            SetOptions.merge()
-        ).await()
+        val memberDoc = doc.collection(MEMBERS_COLLECTION).document(identity.anonymousHash)
+
+        // A timed-out join isn't cancelled server-side — it can still land later — so a retry
+        // could otherwise reach here a second time for the same physical join and double-count it
+        // in activeMembers. Checking whether this device is already a member and bumping the
+        // count atomically, in one transaction, makes that safe regardless of how many times this
+        // ends up actually landing: the count only ever increments the first time.
+        //
+        // The same self-referential members-read rule described in leaveCommunity denies this
+        // existence check with PERMISSION_DENIED whenever this device's own member doc doesn't
+        // exist yet (e.g. rejoining a circle just left) — the opposite situation from
+        // leaveCommunity's, but the same underlying cause. There, that denial means "already
+        // gone"; here it means "not a member yet", so it's treated as alreadyMember = false and
+        // the normal first-time-join path (increment + write) proceeds instead of aborting.
+        firestore.runTransaction { transaction ->
+            val alreadyMember = try {
+                transaction.get(memberDoc).exists()
+            } catch (e: FirebaseFirestoreException) {
+                if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) false else throw e
+            }
+            val communityUpdate = if (alreadyMember) {
+                mapOf(FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp())
+            } else {
+                mapOf(
+                    FIELD_ACTIVE_MEMBERS to FieldValue.increment(1),
+                    FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
+                )
+            }
+            transaction.set(doc, communityUpdate, SetOptions.merge())
+            transaction.set(memberDoc, ownMemberFields(identity.nickname, MemberStatus.OK, agencyScore), SetOptions.merge())
+        }.await()
+
         activeCommunityDao.upsert(ActiveCommunityEntity(communityId = communityId))
-        writeOwnMemberDoc(communityId, MemberStatus.OK)
         val members = doc.collection(MEMBERS_COLLECTION).get().await().documents.map { it.toCommunityMember() }
         doc.get().await().toCommunityState(communityId, members)
     }
@@ -122,14 +148,40 @@ class CommunityRepositoryImpl @Inject constructor(
 
     override suspend fun leaveCommunity(communityId: String): Unit = retryingOnUnauthenticated {
         val identity = userRepository.getOrCreateIdentity()
-        communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash).delete().await()
-        communityDoc(communityId).set(
-            mapOf(
-                FIELD_ACTIVE_MEMBERS to FieldValue.increment(-1),
-                FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
-            ),
-            SetOptions.merge()
-        ).await()
+        val doc = communityDoc(communityId)
+        val memberDoc = doc.collection(MEMBERS_COLLECTION).document(identity.anonymousHash)
+
+        // Symmetric to joinCommunity's fix: a timed-out leave isn't cancelled server-side either,
+        // so a retry could otherwise land twice for the same physical leave and double-decrement
+        // activeMembers. Only delete-and-decrement if this device's member doc still exists; a
+        // retry that finds it already gone (the first attempt's delete already landed) no-ops.
+        //
+        // The members subcollection's read rule only allows reading a doc that still exists (it
+        // gates on that same doc's own existence), so once this device's delete has actually
+        // landed server-side, a later retry's existence check above is itself denied rather than
+        // cleanly reporting "not found" — Firestore surfaces that as PERMISSION_DENIED even though
+        // auth and ownership are both fine. The delete rule itself has no existence precondition,
+        // so that's the only realistic way this specific transaction can be denied; it's treated
+        // the same as an already-completed leave rather than surfaced as a failure.
+        try {
+            firestore.runTransaction { transaction ->
+                val stillMember = transaction.get(memberDoc).exists()
+                if (stillMember) {
+                    transaction.delete(memberDoc)
+                    transaction.set(
+                        doc,
+                        mapOf(
+                            FIELD_ACTIVE_MEMBERS to FieldValue.increment(-1),
+                            FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
+                        ),
+                        SetOptions.merge()
+                    )
+                }
+            }.await()
+        } catch (e: FirebaseFirestoreException) {
+            if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) throw e
+        }
+
         activeCommunityDao.clear()
     }
 
@@ -170,15 +222,9 @@ class CommunityRepositoryImpl @Inject constructor(
     private suspend fun writeOwnMemberDoc(communityId: String, status: MemberStatus): CommunityMember {
         val identity = userRepository.getOrCreateIdentity()
         val agencyScore = agencyRepository.currentAgencyIndex.first().value
-        communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash).set(
-            mapOf(
-                FIELD_NICKNAME to identity.nickname,
-                FIELD_STATUS to status.toFirestoreValue(),
-                FIELD_AGENCY_SCORE to agencyScore,
-                FIELD_LAST_SEEN to FieldValue.serverTimestamp()
-            ),
-            SetOptions.merge()
-        ).await()
+        communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash)
+            .set(ownMemberFields(identity.nickname, status, agencyScore), SetOptions.merge())
+            .await()
         return CommunityMember(
             anonymousId = identity.anonymousHash,
             nickname = identity.nickname,
@@ -186,6 +232,14 @@ class CommunityRepositoryImpl @Inject constructor(
             agencyScore = agencyScore
         )
     }
+
+    /** The field map [writeOwnMemberDoc] and [joinCommunity]'s transaction both write for this device's own roster entry. */
+    private fun ownMemberFields(nickname: String, status: MemberStatus, agencyScore: Int): Map<String, Any> = mapOf(
+        FIELD_NICKNAME to nickname,
+        FIELD_STATUS to status.toFirestoreValue(),
+        FIELD_AGENCY_SCORE to agencyScore,
+        FIELD_LAST_SEEN to FieldValue.serverTimestamp()
+    )
 
     /**
      * Retries [operation] exactly once, first triggering a fresh anonymous sign-in, if it fails

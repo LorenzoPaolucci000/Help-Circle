@@ -12,8 +12,10 @@ import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
 /**
@@ -30,9 +32,17 @@ class AgencyRepositoryImpl @Inject constructor(
     private val weeklyHistoryRepository: WeeklyHistoryRepository
 ) : AgencyRepository {
 
-    override val currentAgencyIndex: Flow<AgencyIndex> = agencyStateDao.observe()
-        .filterNotNull()
-        .map { applyWeeklyResetIfDue(AgencyIndex.of(it.agencyIndexValue)) }
+    // The lazy catch-up runs once here, before ever subscribing to agencyStateDao.observe(),
+    // rather than as a map() over that same observed table's own emissions: writing to a table
+    // from inside a transform that's reacting to that table's own invalidations is a Room/
+    // SQLCipher self-triggering pattern that was found to hang indefinitely on-device (the
+    // upsert's invalidation re-enters the in-flight collection of the very flow doing the
+    // upserting). Running the check as a one-shot suspend step ahead of emitAll(...) means the
+    // write — and everything it invalidates — is fully settled before observation ever starts.
+    override val currentAgencyIndex: Flow<AgencyIndex> = flow {
+        ensureWeeklyResetApplied()
+        emitAll(agencyStateDao.observe().filterNotNull().map { AgencyIndex.of(it.agencyIndexValue) })
+    }
 
     override val currentAgencyState: Flow<AgencyState> = agencyStateDao.observe()
         .filterNotNull()
@@ -96,22 +106,22 @@ class AgencyRepositoryImpl @Inject constructor(
         agencyState = AgencyState.Stable.toStorageName()
     )
 
-    private suspend fun applyWeeklyResetIfDue(index: AgencyIndex): AgencyIndex {
+    private suspend fun ensureWeeklyResetApplied() {
         val boundaryMillis = WeeklyResetCalculator.mostRecentResetBoundaryMillis(System.currentTimeMillis())
         val lastReset = getLastWeeklyResetAtEpochMillis()
-        if (lastReset != null && lastReset >= boundaryMillis) return index
+        if (lastReset != null && lastReset >= boundaryMillis) return
 
+        val currentIndexValue = agencyStateDao.observe().firstOrNull()?.agencyIndexValue ?: AgencyIndex.BASELINE
         val weekStartMillis = boundaryMillis - WeeklyResetCalculator.WEEK_DURATION_MILLIS
         val episodes = weeklyHistoryRepository.getCrisisEpisodesSince(weekStartMillis)
         val previousArchived = getLastArchivedAgencyIndex()
-        val delta = index.value - (previousArchived ?: AgencyIndex.BASELINE)
+        val delta = currentIndexValue - (previousArchived ?: AgencyIndex.BASELINE)
 
         weeklyHistoryRepository.saveWeeklySummary(
             WeeklyResetCalculator.buildWeeklySummary(boundaryMillis, delta, episodes)
         )
-        archiveAgencyIndex(index.value)
+        archiveAgencyIndex(currentIndexValue)
         resetAgencyIndexForNewWeek(boundaryMillis)
-        return AgencyIndex.baseline()
     }
 }
 

@@ -15,6 +15,11 @@ import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -53,6 +58,18 @@ class CommunityDashboardViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CommunityDashboardUiState())
     val uiState: StateFlow<CommunityDashboardUiState> = _uiState.asStateFlow()
 
+    // A Firestore listener's error can arrive right as this ViewModel starts being cleared (e.g.
+    // this community's tab is kept alive in the background by the bottom nav's multi-back-stack
+    // pattern while the user leaves via Settings, then the whole tab host gets torn down the
+    // instant the leave completes) — a race the .catch{} guards below can't fully cover, since by
+    // then there's no longer an active downstream collector for a late exception to be routed
+    // through, so it would otherwise crash the app instead. This scope is still cancelled together
+    // with viewModelScope (same parent Job), but its handler is the backstop that guarantees a
+    // late/racy listener failure is dropped instead of ever reaching an uncaught state.
+    private val listenerScope = CoroutineScope(
+        SupervisorJob(viewModelScope.coroutineContext[Job]) + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, _ -> }
+    )
+
     init {
         viewModelScope.launch {
             val communityId = communityRepository.getActiveCommunityId()
@@ -88,14 +105,14 @@ class CommunityDashboardViewModel @Inject constructor(
                         }
                     }
                 }
-                .launchIn(viewModelScope)
+                .launchIn(listenerScope)
         }
 
         observeIncomingNudges()
             // Same rationale as above: a rejected nudge listener shouldn't crash the dashboard.
             .catch { }
             .onEach { nudge -> _uiState.update { it.copy(latestNudge = nudge) } }
-            .launchIn(viewModelScope)
+            .launchIn(listenerScope)
 
         observeChargeWallet()
             .onEach { wallet -> _uiState.update { it.copy(availableCharges = wallet.currentCharges) } }

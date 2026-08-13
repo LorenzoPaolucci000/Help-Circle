@@ -73,14 +73,22 @@ private fun SettingsContent(
         AlertDialog(
             onDismissRequest = onLeaveCommunityDismissed,
             title = { Text("Leave this circle?") },
-            text = { Text("You'll stop seeing this circle's members and it'll stop seeing you. This can't be undone.") },
+            text = {
+                Column {
+                    Text("You'll stop seeing this circle's members and it'll stop seeing you. This can't be undone.")
+                    uiState.leaveError?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = onLeaveCommunityConfirmed,
                     enabled = !uiState.isLeavingCommunity,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Leave")
+                    Text(if (uiState.leaveTimedOut) "Retry" else "Leave")
                 }
             },
             dismissButton = {
