@@ -17,6 +17,9 @@ interface CommunityRepository {
     suspend fun reportCrisis(communityId: String)
     suspend fun reportRecovery(communityId: String)
 
+    /** Removes this device's own roster entry from [communityId] and forgets it as the active community. */
+    suspend fun leaveCommunity(communityId: String)
+
     /** The community this device last joined, or null if it has never joined one. */
     suspend fun getActiveCommunityId(): String?
 

@@ -28,7 +28,7 @@ service cloud.firestore {
         // A member may only ever write their own entry, and only nickname/status/agencyScore/
         // lastSeen — never anything else, per the Zero-PII rule. agencyScore is a derived 0-100
         // IA_ind value, not behavioral data, so sharing it doesn't violate Zero-PII.
-        allow write: if request.auth != null
+        allow create, update: if request.auth != null
           && request.auth.uid == memberId
           && request.resource.data.keys().hasOnly(['nickname', 'status', 'agencyScore', 'lastSeen'])
           && request.resource.data.nickname is string
@@ -37,6 +37,9 @@ service cloud.firestore {
           && request.resource.data.agencyScore is int
           && request.resource.data.agencyScore >= 0
           && request.resource.data.agencyScore <= 100;
+
+        // Leaving a community removes only the caller's own roster entry.
+        allow delete: if request.auth != null && request.auth.uid == memberId;
       }
 
       match /events/{eventId} {

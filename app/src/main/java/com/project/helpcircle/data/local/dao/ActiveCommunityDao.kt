@@ -14,4 +14,7 @@ interface ActiveCommunityDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: ActiveCommunityEntity)
+
+    @Query("DELETE FROM active_community WHERE id = ${ActiveCommunityEntity.SINGLETON_ID}")
+    suspend fun clear()
 }

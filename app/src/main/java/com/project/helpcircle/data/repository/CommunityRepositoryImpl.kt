@@ -102,6 +102,19 @@ class CommunityRepositoryImpl @Inject constructor(
         writeOwnMemberDoc(communityId, MemberStatus.OK)
     }
 
+    override suspend fun leaveCommunity(communityId: String) {
+        val identity = userRepository.getOrCreateIdentity()
+        communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash).delete().await()
+        communityDoc(communityId).set(
+            mapOf(
+                FIELD_ACTIVE_MEMBERS to FieldValue.increment(-1),
+                FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
+            ),
+            SetOptions.merge()
+        ).await()
+        activeCommunityDao.clear()
+    }
+
     override suspend fun getActiveCommunityId(): String? = activeCommunityDao.get()?.communityId
 
     override suspend fun getMemberCount(communityId: String): Int =
