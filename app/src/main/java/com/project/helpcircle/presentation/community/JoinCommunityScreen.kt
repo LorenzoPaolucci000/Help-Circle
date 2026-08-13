@@ -141,7 +141,7 @@ private fun JoinTabContent(
                 color = MaterialTheme.colorScheme.onPrimary
             )
         } else {
-            Text("Join")
+            Text(if (uiState.joinTimedOut) "Retry" else "Join")
         }
     }
 }
@@ -181,7 +181,7 @@ private fun CreateTabContent(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             } else {
-                Text("Create a circle")
+                Text(if (uiState.createTimedOut) "Retry" else "Create a circle")
             }
         }
     } else {

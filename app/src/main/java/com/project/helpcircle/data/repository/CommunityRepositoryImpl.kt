@@ -1,8 +1,10 @@
 package com.project.helpcircle.data.repository
 
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
 import com.project.helpcircle.data.local.dao.ActiveCommunityDao
 import com.project.helpcircle.data.local.entity.ActiveCommunityEntity
@@ -41,6 +43,7 @@ import kotlinx.coroutines.tasks.await
  */
 class CommunityRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
+    private val firebaseAuth: FirebaseAuth,
     private val userRepository: UserRepository,
     private val agencyRepository: AgencyRepository,
     private val activeCommunityDao: ActiveCommunityDao
@@ -51,7 +54,7 @@ class CommunityRepositoryImpl @Inject constructor(
             doc.toCommunityState(communityId, members)
         }
 
-    override suspend fun joinCommunity(communityId: String): CommunityState {
+    override suspend fun joinCommunity(communityId: String): CommunityState = retryingOnUnauthenticated {
         val doc = communityDoc(communityId)
         doc.set(
             mapOf(
@@ -63,46 +66,61 @@ class CommunityRepositoryImpl @Inject constructor(
         activeCommunityDao.upsert(ActiveCommunityEntity(communityId = communityId))
         writeOwnMemberDoc(communityId, MemberStatus.OK)
         val members = doc.collection(MEMBERS_COLLECTION).get().await().documents.map { it.toCommunityMember() }
-        return doc.get().await().toCommunityState(communityId, members)
+        doc.get().await().toCommunityState(communityId, members)
     }
 
-    override suspend fun createCommunity(inviteCode: String): CommunityState {
-        val doc = firestore.collection(COMMUNITIES_COLLECTION).document()
-        doc.set(
-            mapOf(
-                FIELD_INVITE_CODE to inviteCode,
-                FIELD_ACTIVE_MEMBERS to FieldValue.increment(1),
-                FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
+    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState =
+        retryingOnUnauthenticated {
+            val doc = communityDoc(communityId)
+            doc.set(
+                mapOf(
+                    FIELD_INVITE_CODE to inviteCode,
+                    // A literal 1, not FieldValue.increment(1): this document doesn't exist yet
+                    // when a create is first attempted, and — since communityId is now stable
+                    // across retries of the same attempt (see the interface doc) — this write may
+                    // legitimately land more than once for the same logical create. An increment
+                    // would double-count; a literal overwrite is naturally idempotent.
+                    FIELD_ACTIVE_MEMBERS to 1,
+                    FIELD_LAST_ACTIVITY to FieldValue.serverTimestamp()
+                )
+            ).await()
+            activeCommunityDao.upsert(ActiveCommunityEntity(communityId = communityId))
+            // No need to re-fetch the member roster or the community doc afterward — a freshly
+            // created circle has exactly one member (the caller, just written below) and the invite
+            // code is the one we just wrote, so both are already known locally. This cuts what used
+            // to be 4 sequential network round-trips down to 2.
+            val ownMember = writeOwnMemberDoc(communityId, MemberStatus.OK)
+            CommunityState(
+                communityId = communityId,
+                memberAgencyIndices = listOf(AgencyIndex.of(ownMember.agencyScore)),
+                cohesionBonusApplied = ownMember.agencyScore >= COHESION_THRESHOLD,
+                members = listOf(ownMember),
+                inviteCode = inviteCode
             )
-        ).await()
-        activeCommunityDao.upsert(ActiveCommunityEntity(communityId = doc.id))
-        writeOwnMemberDoc(doc.id, MemberStatus.OK)
-        val members = doc.collection(MEMBERS_COLLECTION).get().await().documents.map { it.toCommunityMember() }
-        return doc.get().await().toCommunityState(doc.id, members)
-    }
+        }
 
-    override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? {
+    override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = retryingOnUnauthenticated {
         val match = firestore.collection(COMMUNITIES_COLLECTION)
             .whereEqualTo(FIELD_INVITE_CODE, inviteCode)
             .limit(1)
             .get()
             .await()
             .documents
-            .firstOrNull() ?: return null
-        return joinCommunity(match.id)
+            .firstOrNull() ?: return@retryingOnUnauthenticated null
+        joinCommunity(match.id)
     }
 
-    override suspend fun reportCrisis(communityId: String) {
+    override suspend fun reportCrisis(communityId: String): Unit = retryingOnUnauthenticated {
         writeEvent(communityId, EVENT_TYPE_CRISIS_ALERT)
         writeOwnMemberDoc(communityId, MemberStatus.CRISIS)
     }
 
-    override suspend fun reportRecovery(communityId: String) {
+    override suspend fun reportRecovery(communityId: String): Unit = retryingOnUnauthenticated {
         writeEvent(communityId, EVENT_TYPE_RECOVERY_REPORTED)
         writeOwnMemberDoc(communityId, MemberStatus.OK)
     }
 
-    override suspend fun leaveCommunity(communityId: String) {
+    override suspend fun leaveCommunity(communityId: String): Unit = retryingOnUnauthenticated {
         val identity = userRepository.getOrCreateIdentity()
         communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash).delete().await()
         communityDoc(communityId).set(
@@ -117,8 +135,9 @@ class CommunityRepositoryImpl @Inject constructor(
 
     override suspend fun getActiveCommunityId(): String? = activeCommunityDao.get()?.communityId
 
-    override suspend fun getMemberCount(communityId: String): Int =
+    override suspend fun getMemberCount(communityId: String): Int = retryingOnUnauthenticated {
         communityDoc(communityId).collection(MEMBERS_COLLECTION).get().await().size()
+    }
 
     private fun observeCommunityDoc(communityId: String): Flow<DocumentSnapshot> = callbackFlow {
         val registration = communityDoc(communityId).addSnapshotListener { snapshot, error ->
@@ -143,8 +162,12 @@ class CommunityRepositoryImpl @Inject constructor(
         awaitClose { registration.remove() }
     }
 
-    /** Writes only this device's own roster entry — nickname, coarse status, and derived agencyScore, per Zero-PII. */
-    private suspend fun writeOwnMemberDoc(communityId: String, status: MemberStatus) {
+    /**
+     * Writes only this device's own roster entry — nickname, coarse status, and derived
+     * agencyScore, per Zero-PII — and hands back what it wrote, so callers that already know the
+     * result (e.g. [createCommunity]) don't need a separate read to find out.
+     */
+    private suspend fun writeOwnMemberDoc(communityId: String, status: MemberStatus): CommunityMember {
         val identity = userRepository.getOrCreateIdentity()
         val agencyScore = agencyRepository.currentAgencyIndex.first().value
         communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash).set(
@@ -156,7 +179,31 @@ class CommunityRepositoryImpl @Inject constructor(
             ),
             SetOptions.merge()
         ).await()
+        return CommunityMember(
+            anonymousId = identity.anonymousHash,
+            nickname = identity.nickname,
+            status = status,
+            agencyScore = agencyScore
+        )
     }
+
+    /**
+     * Retries [operation] exactly once, first triggering a fresh anonymous sign-in, if it fails
+     * with an UNAUTHENTICATED Firestore error — the session's ID token can go stale (e.g. after a
+     * long idle period), and a fresh sign-in resolves that transient condition without surfacing
+     * an error to the caller for something that's expected to self-heal.
+     */
+    private suspend fun <T> retryingOnUnauthenticated(operation: suspend () -> T): T =
+        try {
+            operation()
+        } catch (e: FirebaseFirestoreException) {
+            if (e.code == FirebaseFirestoreException.Code.UNAUTHENTICATED) {
+                firebaseAuth.signInAnonymously().await()
+                operation()
+            } else {
+                throw e
+            }
+        }
 
     private suspend fun writeEvent(communityId: String, type: String) {
         val senderId = userRepository.getOrCreateIdentity().anonymousHash

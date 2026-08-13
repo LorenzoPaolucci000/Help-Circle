@@ -21,8 +21,8 @@ private class JoinByInviteCodeFakeRepository(
     override suspend fun joinCommunity(communityId: String): CommunityState =
         CommunityState(communityId, emptyList(), cohesionBonusApplied = false)
 
-    override suspend fun createCommunity(inviteCode: String): CommunityState =
-        CommunityState("generated-id", emptyList(), cohesionBonusApplied = false, inviteCode = inviteCode)
+    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState =
+        CommunityState(communityId, emptyList(), cohesionBonusApplied = false, inviteCode = inviteCode)
 
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? {
         lastLookedUpInviteCode = inviteCode

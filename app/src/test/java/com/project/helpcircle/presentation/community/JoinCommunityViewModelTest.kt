@@ -29,7 +29,7 @@ private class JoinCommunityFakeRepository(
     override fun observeCommunityState(communityId: String): Flow<CommunityState> = emptyFlow()
     override suspend fun joinCommunity(communityId: String): CommunityState = throw UnsupportedOperationException()
 
-    override suspend fun createCommunity(inviteCode: String): CommunityState {
+    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState {
         // A plain RuntimeException here, deliberately not IllegalStateException, so this stays
         // distinct from the use case's own blacklist-check failure and correctly exercises the
         // ViewModel's generic-exception fallback path rather than colliding with it.

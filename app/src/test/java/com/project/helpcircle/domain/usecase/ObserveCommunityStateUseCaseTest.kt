@@ -21,7 +21,7 @@ private class ObserveCommunityStateFakeRepository(
     override fun observeCommunityState(communityId: String): Flow<CommunityState> = stateFlow
 
     override suspend fun joinCommunity(communityId: String): CommunityState = stateFlow.value
-    override suspend fun createCommunity(inviteCode: String): CommunityState = stateFlow.value
+    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState = stateFlow.value
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit

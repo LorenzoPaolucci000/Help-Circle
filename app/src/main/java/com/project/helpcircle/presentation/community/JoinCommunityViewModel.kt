@@ -7,6 +7,7 @@ import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,17 +15,23 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 enum class JoinCommunityTab { JOIN, CREATE }
+
+private const val NETWORK_TIMEOUT_MILLIS = 15_000L
+private const val SLOW_CONNECTION_MESSAGE = "Connection is slow — tap to try again"
 
 data class JoinCommunityUiState(
     val selectedTab: JoinCommunityTab = JoinCommunityTab.JOIN,
     val inviteCodeInput: String = "",
     val isJoining: Boolean = false,
     val joinError: String? = null,
+    val joinTimedOut: Boolean = false,
     val isCreating: Boolean = false,
     val createError: String? = null,
+    val createTimedOut: Boolean = false,
     val createdInviteCode: String? = null,
     val hasJoined: Boolean = false,
     // Optimistic default so the blocking banner doesn't flash on screen before the first read of
@@ -53,20 +60,24 @@ class JoinCommunityViewModel @Inject constructor(
     }
 
     fun onInviteCodeInputChanged(inviteCode: String) {
-        _uiState.update { it.copy(inviteCodeInput = inviteCode, joinError = null) }
+        _uiState.update { it.copy(inviteCodeInput = inviteCode, joinError = null, joinTimedOut = false) }
     }
 
     fun onJoinClicked() {
         val inviteCode = _uiState.value.inviteCodeInput.trim()
         if (inviteCode.isEmpty()) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isJoining = true, joinError = null) }
+            _uiState.update { it.copy(isJoining = true, joinError = null, joinTimedOut = false) }
             try {
-                val joined = joinCommunityByInviteCode(inviteCode)
+                val joined = withTimeout(NETWORK_TIMEOUT_MILLIS) { joinCommunityByInviteCode(inviteCode) }
                 if (joined != null) {
                     _uiState.update { it.copy(isJoining = false, hasJoined = true) }
                 } else {
                     _uiState.update { it.copy(isJoining = false, joinError = "Code not found") }
+                }
+            } catch (e: TimeoutCancellationException) {
+                _uiState.update {
+                    it.copy(isJoining = false, joinError = SLOW_CONNECTION_MESSAGE, joinTimedOut = true)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -85,10 +96,14 @@ class JoinCommunityViewModel @Inject constructor(
 
     fun onCreateClicked() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isCreating = true, createError = null) }
+            _uiState.update { it.copy(isCreating = true, createError = null, createTimedOut = false) }
             try {
-                val state = createCommunity()
+                val state = withTimeout(NETWORK_TIMEOUT_MILLIS) { createCommunity() }
                 _uiState.update { it.copy(isCreating = false, createdInviteCode = state.inviteCode) }
+            } catch (e: TimeoutCancellationException) {
+                _uiState.update {
+                    it.copy(isCreating = false, createError = SLOW_CONNECTION_MESSAGE, createTimedOut = true)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IllegalStateException) {
