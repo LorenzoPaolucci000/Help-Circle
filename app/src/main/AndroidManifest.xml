@@ -46,6 +46,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".presentation.fallback.SystemFallbackActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.HelpCircle.Fallback" />
+
         <service
             android:name=".os.DoomscrollAccessibilityService"
             android:exported="true"

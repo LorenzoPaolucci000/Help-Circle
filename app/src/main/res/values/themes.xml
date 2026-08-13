@@ -2,4 +2,8 @@
 <resources>
 
     <style name="Theme.HelpCircle" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Floating dialog window, not full-screen, for the System Fallback prompt launched from the
+         accessibility service — keeps it a "non-intrusive" overlay rather than taking over the screen. -->
+    <style name="Theme.HelpCircle.Fallback" parent="android:Theme.Material.Light.Dialog" />
 </resources>

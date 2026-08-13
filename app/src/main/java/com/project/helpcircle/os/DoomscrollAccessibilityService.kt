@@ -10,6 +10,7 @@ import com.project.helpcircle.domain.model.categoryLabel
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
+import com.project.helpcircle.presentation.fallback.SystemFallbackActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +37,9 @@ import kotlinx.coroutines.launch
  * detector alive. Being the app's one long-running background component, it also collects
  * [NudgeRepository.incomingNudges] and dispatches each one to [HelpCircleNotificationManager],
  * and marks the delivery on [CrisisEpisodeTracker] so it can score how the crisis episode ends.
+ *
+ * Also launches [SystemFallbackActivity] whenever [DetectLossOfAgencyUseCase] reports that the
+ * community is offline or hasn't responded to a crisis in time, per the System Fallback spec.
  */
 @AndroidEntryPoint
 class DoomscrollAccessibilityService : AccessibilityService() {
@@ -95,7 +99,10 @@ class DoomscrollAccessibilityService : AccessibilityService() {
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_SCROLLED, AccessibilityEvent.TYPE_VIEW_CLICKED -> {
                 val signal = ScrollSignal(timestampMillis = System.currentTimeMillis())
-                serviceScope.launch { detectLossOfAgencyUseCase(signal) }
+                serviceScope.launch {
+                    val result = detectLossOfAgencyUseCase(signal)
+                    if (result.offerSystemFallback) startActivity(SystemFallbackActivity.newIntent(this@DoomscrollAccessibilityService))
+                }
             }
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 val foregroundPackageName = event.packageName?.toString() ?: return
