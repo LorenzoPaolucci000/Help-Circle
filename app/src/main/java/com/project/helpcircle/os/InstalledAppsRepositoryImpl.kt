@@ -12,8 +12,13 @@ import javax.inject.Inject
 /**
  * [InstalledAppsRepository] backed by `PackageManager` — the only place in the app that queries
  * the device's installed-app listing, kept at the OS boundary per Clean Architecture. Only
- * launchable, non-system apps (excluding this app itself) are surfaced, since the monitored-apps
- * blacklist is only ever meaningful for apps the user can actually open and scroll through.
+ * launchable apps (excluding this app itself) are surfaced, tagged with [AppInfo.isSystemApp]
+ * (`ApplicationInfo.FLAG_SYSTEM`) rather than filtered on it here — deciding which apps are
+ * actually monitorable, system or not, is [com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase]'s
+ * business rule to make, not this repository's. A blanket system-app exclusion at this layer was
+ * tried and reverted: several target feed apps (e.g. YouTube) ship pre-installed as system apps on
+ * GMS-certified devices, so it silently defeated that use case's allowlist — confirmed on-device
+ * (Vivo V2110).
  * Requires the `<queries>` package-visibility declaration in AndroidManifest.xml on API 30+.
  */
 class InstalledAppsRepositoryImpl @Inject constructor(
@@ -32,12 +37,12 @@ class InstalledAppsRepositoryImpl @Inject constructor(
             .map { it.activityInfo.applicationInfo }
             .distinctBy { it.packageName }
             .filter { it.packageName != context.packageName }
-            .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
             .map { applicationInfo ->
                 AppInfo(
                     packageName = applicationInfo.packageName,
                     displayName = packageManager.getApplicationLabel(applicationInfo).toString(),
-                    category = applicationInfo.toAppCategory()
+                    category = applicationInfo.toAppCategory(),
+                    isSystemApp = applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0
                 )
             }
             .toList()

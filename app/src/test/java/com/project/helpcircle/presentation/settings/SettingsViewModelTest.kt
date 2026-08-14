@@ -58,7 +58,7 @@ private class SettingsFakeCommunityRepository(private val activeCommunityId: Str
 class SettingsViewModelTest {
 
     private val socialApp = AppInfo("com.social", "SocialApp", AppCategory.SOCIAL)
-    private val newsApp = AppInfo("com.news", "NewsApp", AppCategory.NEWS)
+    private val videoApp = AppInfo("com.video", "VideoApp", AppCategory.VIDEO)
 
     @Before
     fun setUp() {
@@ -71,7 +71,7 @@ class SettingsViewModelTest {
     }
 
     private fun viewModel(
-        apps: List<AppInfo> = listOf(socialApp, newsApp),
+        apps: List<AppInfo> = listOf(socialApp, videoApp),
         monitored: Set<String> = emptySet(),
         activeCommunityId: String? = "comm-1",
         communityRepository: SettingsFakeCommunityRepository = SettingsFakeCommunityRepository(activeCommunityId)
@@ -92,7 +92,7 @@ class SettingsViewModelTest {
 
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
-        assertEquals(listOf(newsApp, socialApp), state.apps)
+        assertEquals(listOf(socialApp, videoApp), state.apps)
         assertEquals(setOf("com.social"), state.pendingMonitoredPackageNames)
     }
 
@@ -100,9 +100,9 @@ class SettingsViewModelTest {
     fun `search query filters apps by category grouping`() {
         val (viewModel, _) = viewModel()
 
-        viewModel.onSearchQueryChanged("news")
+        viewModel.onSearchQueryChanged("video")
 
-        assertEquals(mapOf(AppCategory.NEWS to listOf(newsApp)), viewModel.uiState.value.appsByCategory)
+        assertEquals(mapOf(AppCategory.VIDEO to listOf(videoApp)), viewModel.uiState.value.appsByCategory)
     }
 
     @Test

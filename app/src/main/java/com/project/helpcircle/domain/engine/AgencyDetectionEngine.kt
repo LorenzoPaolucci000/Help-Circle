@@ -13,7 +13,10 @@ data class ScrollSignal(val timestampMillis: Long)
  */
 class AgencyDetectionEngine(
     private val windowSize: Duration = 60.seconds,
-    private val scrollThreshold: Int = 40,
+    // Scroll-only cadence (taps no longer feed this window — see DoomscrollAccessibilityService).
+    // Lowered from the old combined scroll+click threshold of 40 to compensate for the dropped
+    // tap signal, without overcorrecting into false positives on ordinary brisk scrolling.
+    private val scrollThreshold: Int = 30,
     private val warningRatio: Double = 0.6
 ) {
     private val recentSignals = ArrayDeque<Long>()

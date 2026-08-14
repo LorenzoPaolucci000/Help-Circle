@@ -168,4 +168,50 @@ class CrisisEpisodeTrackerTest {
 
         assertEquals(AgencyDelta.NONE, delta)
     }
+
+    @Test
+    fun `a break started is reported back as pending`() {
+        val tracker = CrisisEpisodeTracker()
+        tracker.onAgencyStateUpdated(AgencyState.Crisis, atEpochMillis = 0)
+
+        tracker.onBreakStarted(atEpochMillis = 1_000)
+
+        assertEquals(1_000L, tracker.pendingBreakStartedAtMillis())
+    }
+
+    @Test
+    fun `cancelling a pending break clears it without scoring`() {
+        val tracker = CrisisEpisodeTracker()
+        tracker.onAgencyStateUpdated(AgencyState.Crisis, atEpochMillis = 0)
+        tracker.onBreakStarted(atEpochMillis = 1_000)
+
+        tracker.cancelPendingBreak()
+
+        assertNull(tracker.pendingBreakStartedAtMillis())
+    }
+
+    @Test
+    fun `a fresh crisis episode clears any pending break carried over from before`() {
+        val tracker = CrisisEpisodeTracker()
+        tracker.onAgencyStateUpdated(AgencyState.Crisis, atEpochMillis = 0)
+        tracker.onAgencyStateUpdated(AgencyState.Stable, atEpochMillis = 1_000)
+        // Set again after the episode closed, purely to exercise the defensive reset below —
+        // normal flow never leaves a break pending across episode boundaries on its own.
+        tracker.onBreakStarted(atEpochMillis = 1_500)
+
+        tracker.onAgencyStateUpdated(AgencyState.Crisis, atEpochMillis = 2_000)
+
+        assertNull(tracker.pendingBreakStartedAtMillis())
+    }
+
+    @Test
+    fun `closing an episode clears any pending break`() {
+        val tracker = CrisisEpisodeTracker()
+        tracker.onAgencyStateUpdated(AgencyState.Crisis, atEpochMillis = 0)
+        tracker.onBreakStarted(atEpochMillis = 1_000)
+
+        tracker.onAgencyStateUpdated(AgencyState.Stable, atEpochMillis = DetectionConfig.SPONTANEOUS_RECOVERY_WINDOW_MS)
+
+        assertNull(tracker.pendingBreakStartedAtMillis())
+    }
 }

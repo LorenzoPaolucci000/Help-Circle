@@ -2,6 +2,7 @@ package com.project.helpcircle.domain.usecase
 
 import com.project.helpcircle.domain.engine.AgencyDetectionEngine
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
+import com.project.helpcircle.domain.engine.DetectionConfig
 import com.project.helpcircle.domain.engine.ScrollSignal
 import com.project.helpcircle.domain.engine.SystemFallbackEvaluator
 import com.project.helpcircle.domain.model.AgencyIndex
@@ -20,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -89,14 +91,19 @@ private fun useCase(
     weeklyHistoryRepository: DetectLossFakeWeeklyHistoryRepository,
     tracker: CrisisEpisodeTracker = CrisisEpisodeTracker(),
     communityRepository: CommunityRepository = DetectLossFakeCommunityRepository(activeCommunityId = "comm-1", memberCount = 2)
-) = DetectLossOfAgencyUseCase(
-    engine,
-    agencyRepository,
-    tracker,
-    CalculateAgencyIndexUseCase(agencyRepository),
-    weeklyHistoryRepository,
-    EvaluateSystemFallbackUseCase(tracker, SystemFallbackEvaluator(tracker), communityRepository)
-)
+): DetectLossOfAgencyUseCase {
+    val calculateAgencyIndexUseCase = CalculateAgencyIndexUseCase(agencyRepository)
+    return DetectLossOfAgencyUseCase(
+        engine,
+        agencyRepository,
+        tracker,
+        calculateAgencyIndexUseCase,
+        weeklyHistoryRepository,
+        EvaluateSystemFallbackUseCase(tracker, SystemFallbackEvaluator(tracker), communityRepository),
+        AcknowledgeRecoveryUseCase(agencyRepository, tracker, calculateAgencyIndexUseCase, weeklyHistoryRepository),
+        communityRepository
+    )
+}
 
 class DetectLossOfAgencyUseCaseTest {
 
@@ -178,5 +185,65 @@ class DetectLossOfAgencyUseCaseTest {
 
         assertEquals(AgencyState.Crisis, result.state)
         assertFalse(result.offerSystemFallback)
+    }
+
+    @Test
+    fun `resuming scrolling before the break duration elapses cancels it and awards nothing`() = runBlocking {
+        val agencyRepository = DetectLossFakeAgencyRepository()
+        val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
+        val engine = AgencyDetectionEngine(windowSize = 200.seconds, scrollThreshold = 2, warningRatio = 1.0)
+        val tracker = CrisisEpisodeTracker()
+        val detectLossOfAgency = useCase(engine, agencyRepository, weeklyHistoryRepository, tracker)
+        detectLossOfAgency(ScrollSignal(0))
+        detectLossOfAgency(ScrollSignal(100))
+        tracker.onBreakStarted(atEpochMillis = 100)
+
+        // Comes back and scrolls again well before the 2-minute break duration is up.
+        val earlyResult = detectLossOfAgency(ScrollSignal(100 + 10_000))
+
+        assertEquals(AgencyIndex.baseline(), agencyRepository.indexFlow.value)
+        assertNull(tracker.pendingBreakStartedAtMillis())
+        assertTrue(weeklyHistoryRepository.recordedEpisodes.isEmpty())
+        assertEquals(AgencyState.Crisis, earlyResult.state)
+    }
+
+    @Test
+    fun `a genuinely completed break awards the assisted-break bonus and resets the sliding window`() = runBlocking {
+        val agencyRepository = DetectLossFakeAgencyRepository()
+        val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
+        // A window wider than the break duration proves the reset actually matters: without it,
+        // the two crisis-triggering signals from before the break would still be inside this
+        // window by the time the break resolves, and would immediately push state back to Crisis.
+        val engine = AgencyDetectionEngine(windowSize = 200.seconds, scrollThreshold = 2, warningRatio = 1.0)
+        val tracker = CrisisEpisodeTracker()
+        val detectLossOfAgency = useCase(engine, agencyRepository, weeklyHistoryRepository, tracker)
+        detectLossOfAgency(ScrollSignal(0))
+        val crisisResult = detectLossOfAgency(ScrollSignal(100))
+        tracker.onBreakStarted(atEpochMillis = 100)
+
+        val resolvedResult = detectLossOfAgency(
+            ScrollSignal(100 + DetectionConfig.SYSTEM_FALLBACK_BREAK_DURATION_MS)
+        )
+
+        assertEquals(AgencyState.Crisis, crisisResult.state)
+        assertEquals(AgencyState.Stable, resolvedResult.state)
+        assertEquals(50 + DetectionConfig.ASSISTED_BREAK_COMPLETION_DELTA, agencyRepository.indexFlow.value.value)
+        assertNull(tracker.pendingBreakStartedAtMillis())
+        assertEquals(1, weeklyHistoryRepository.recordedEpisodes.size)
+    }
+
+    @Test
+    fun `organic spontaneous recovery unrelated to a break is unaffected and still awards plus 5`() = runBlocking {
+        val agencyRepository = DetectLossFakeAgencyRepository()
+        val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
+        val engine = AgencyDetectionEngine(windowSize = 1.seconds, scrollThreshold = 2, warningRatio = 1.0)
+        val detectLossOfAgency = useCase(engine, agencyRepository, weeklyHistoryRepository)
+
+        detectLossOfAgency(ScrollSignal(0))
+        detectLossOfAgency(ScrollSignal(100))
+        val recoveredResult = detectLossOfAgency(ScrollSignal(2_100))
+
+        assertEquals(AgencyState.Stable, recoveredResult.state)
+        assertEquals(50 + DetectionConfig.SPONTANEOUS_RECOVERY_DELTA, agencyRepository.indexFlow.value.value)
     }
 }

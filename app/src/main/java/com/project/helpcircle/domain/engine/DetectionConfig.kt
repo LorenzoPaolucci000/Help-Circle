@@ -18,6 +18,17 @@ object DetectionConfig {
     /** No peer responding is never penalized — peer unavailability isn't the user's fault. */
     const val UNASSISTED_TIMEOUT_DELTA = 0
 
+    /**
+     * Awarded, on top of (not instead of) whatever [SPONTANEOUS_RECOVERY_DELTA] check applies, when
+     * the System Fallback prompt's timed break is genuinely completed — i.e. [SYSTEM_FALLBACK_BREAK_DURATION_MS]
+     * of real elapsed time is confirmed before the recovery is scored, not merely tapped. Kept
+     * separate from the base thesis formula's spontaneous-recovery term, which this deliberately
+     * doesn't replace: a break is deliberately slower than the 60s spontaneous-recovery window, so
+     * without this it would otherwise net zero Delta_Autonomy despite being the *intended*, honest
+     * use of the tool.
+     */
+    const val ASSISTED_BREAK_COMPLETION_DELTA = 3
+
     // Delta_Support modifiers
 
     /** Awarded when a supporter's nudge is followed by the user exiting the app within [EFFECTIVE_INTERVENTION_WINDOW_MS]. */
@@ -31,4 +42,7 @@ object DetectionConfig {
     const val SPONTANEOUS_RECOVERY_WINDOW_MS = 60 * 1000L
     const val IGNORED_CRISIS_THRESHOLD_MS = 3 * 60 * 1000L
     const val EFFECTIVE_INTERVENTION_WINDOW_MS = 90 * 1000L
+
+    /** Real elapsed time required before a System Fallback break counts as genuinely taken. */
+    const val SYSTEM_FALLBACK_BREAK_DURATION_MS = 2 * 60 * 1000L
 }

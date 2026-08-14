@@ -35,6 +35,7 @@ fun SystemFallbackScreen(
     }
 
     SystemFallbackContent(
+        isBreakStarted = uiState.isBreakStarted,
         onTakeBreakClicked = viewModel::onTakeBreakClicked,
         onContinueClicked = viewModel::onContinueClicked,
         modifier = modifier
@@ -43,6 +44,7 @@ fun SystemFallbackScreen(
 
 @Composable
 private fun SystemFallbackContent(
+    isBreakStarted: Boolean,
     onTakeBreakClicked: () -> Unit,
     onContinueClicked: () -> Unit,
     modifier: Modifier = Modifier
@@ -53,24 +55,38 @@ private fun SystemFallbackContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = "Your circle isn't around right now",
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Would you like to take a short break?",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onTakeBreakClicked, modifier = Modifier.fillMaxWidth()) {
-                Text("Take a 2-minute break")
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(onClick = onContinueClicked, modifier = Modifier.fillMaxWidth()) {
-                Text("I'm in control — continue")
+            if (isBreakStarted) {
+                Text(
+                    text = "Break started",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "See you in a couple of minutes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = "Your circle isn't around right now",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Would you like to take a short break?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = onTakeBreakClicked, modifier = Modifier.fillMaxWidth()) {
+                    Text("Take a 2-minute break")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(onClick = onContinueClicked, modifier = Modifier.fillMaxWidth()) {
+                    Text("I'm in control — continue")
+                }
             }
         }
     }

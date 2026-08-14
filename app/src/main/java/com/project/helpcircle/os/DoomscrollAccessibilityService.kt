@@ -1,6 +1,7 @@
 package com.project.helpcircle.os
 
 import android.accessibilityservice.AccessibilityService
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.engine.ForegroundAppTracker
@@ -22,8 +23,11 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 /**
- * Passive accessibility boundary: observes scroll/tap events in apps on the user's monitored-apps
- * blacklist and turns each one into a [ScrollSignal] for [DetectLossOfAgencyUseCase]. Reads only
+ * Passive accessibility boundary: observes scroll events in apps on the user's monitored-apps
+ * blacklist and turns each one into a [ScrollSignal] for [DetectLossOfAgencyUseCase]. Taps
+ * (TYPE_VIEW_CLICKED) are deliberately not observed — counting them alongside scrolls made
+ * non-doomscroll activity (e.g. chatting: tapping send/react, scrolling message history) trigger
+ * the same crisis window as feed-doomscrolling, so detection is now scroll-cadence-only. Reads only
  * the event's type and a local timestamp — never window content or on-screen text — so raw usage
  * data never leaves this boundary, per the Zero-PII rule. Event coalescing is left to the
  * framework's `notificationTimeout` (see the service's accessibility config) rather than custom
@@ -113,10 +117,18 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // TEMPORARY diagnostic logging — unconditional, before any filtering, to compare which
+        // event types (if any) YouTube/TikTok's page-based UI dispatches versus Prime Video's
+        // classic scrollable list. Remove once the real device data is in.
+        Log.e(
+            "HC_VERIFY",
+            "eventType=${event?.eventType} pkg=${event?.packageName} class=${event?.className} " +
+                "contentChangeTypes=${event?.contentChangeTypes} scrollX=${event?.scrollX} scrollY=${event?.scrollY}"
+        )
         if (event == null || event.packageName == packageName) return
         when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_SCROLLED, AccessibilityEvent.TYPE_VIEW_CLICKED -> {
-                // Only scroll/tap activity in an app the user opted to monitor should ever feed
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                // Only scroll activity in an app the user opted to monitor should ever feed
                 // crisis detection; an empty blacklist means nothing is being watched, per
                 // ForegroundAppTracker's default-false state before any foreground app is known.
                 if (!foregroundAppTracker.isCurrentForegroundAppBlacklisted) return

@@ -38,7 +38,7 @@ private class SelectAppsFakeMonitoredAppsRepository(initial: Set<String> = empty
 class SelectMonitoredAppsViewModelTest {
 
     private val socialApp = AppInfo("com.social", "SocialApp", AppCategory.SOCIAL)
-    private val newsApp = AppInfo("com.news", "NewsApp", AppCategory.NEWS)
+    private val videoApp = AppInfo("com.video", "VideoApp", AppCategory.VIDEO)
 
     @Before
     fun setUp() {
@@ -51,7 +51,7 @@ class SelectMonitoredAppsViewModelTest {
     }
 
     private fun viewModel(
-        apps: List<AppInfo> = listOf(socialApp, newsApp),
+        apps: List<AppInfo> = listOf(socialApp, videoApp),
         monitoredAppsRepository: SelectAppsFakeMonitoredAppsRepository = SelectAppsFakeMonitoredAppsRepository()
     ) = SelectMonitoredAppsViewModel(
         GetInstalledAppsUseCase(SelectAppsFakeInstalledAppsRepository(apps)),
@@ -64,7 +64,7 @@ class SelectMonitoredAppsViewModelTest {
 
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
-        assertEquals(listOf(newsApp, socialApp), state.apps)
+        assertEquals(listOf(socialApp, videoApp), state.apps)
         assertTrue(state.pendingMonitoredPackageNames.isEmpty())
     }
 

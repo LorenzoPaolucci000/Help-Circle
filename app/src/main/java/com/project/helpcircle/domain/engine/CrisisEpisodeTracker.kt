@@ -34,6 +34,7 @@ class CrisisEpisodeTracker {
     private var nudgeCategory: String? = null
     private var ignoredPenaltyApplied = false
     private var activePresenceApplied = false
+    private var breakStartedAtMillis: Long? = null
 
     /** Marks that a nudge of [category] was delivered during the current crisis episode; only the first counts. */
     fun onNudgeReceived(atEpochMillis: Long, category: String) {
@@ -49,6 +50,24 @@ class CrisisEpisodeTracker {
     /** Whether a peer's nudge has already been delivered during the current crisis episode. */
     fun hasReceivedNudgeThisEpisode(): Boolean = nudgeReceivedAtMillis != null
 
+    /**
+     * Marks that the user committed to the System Fallback prompt's timed break. Awards nothing by
+     * itself — the caller is responsible for verifying real elapsed time against
+     * [pendingBreakStartedAtMillis] before scoring, which is what actually closes the instant-tap
+     * exploit this exists to prevent.
+     */
+    fun onBreakStarted(atEpochMillis: Long) {
+        breakStartedAtMillis = atEpochMillis
+    }
+
+    /** When the current pending break was started, or null if none is pending. Read-only; callers can't affect scoring through it. */
+    fun pendingBreakStartedAtMillis(): Long? = breakStartedAtMillis
+
+    /** Voids a pending break without scoring — e.g. the user resumed scrolling before it genuinely completed. */
+    fun cancelPendingBreak() {
+        breakStartedAtMillis = null
+    }
+
     /** Feeds a new [AgencyState] reading and returns any [AgencyDelta] this transition/tick earns. */
     fun onAgencyStateUpdated(state: AgencyState, atEpochMillis: Long): AgencyDelta {
         val wasInCrisis = crisisStartedAtMillis != null
@@ -59,6 +78,7 @@ class CrisisEpisodeTracker {
             nudgeCategory = null
             ignoredPenaltyApplied = false
             activePresenceApplied = false
+            breakStartedAtMillis = null
             return AgencyDelta.NONE
         }
 
@@ -106,6 +126,7 @@ class CrisisEpisodeTracker {
         nudgeCategory = null
         ignoredPenaltyApplied = false
         activePresenceApplied = false
+        breakStartedAtMillis = null
 
         return AgencyDelta(deltaAutonomy, deltaSupport, closedEpisode)
     }

@@ -4,7 +4,8 @@ package com.project.helpcircle.domain.model
 data class AppInfo(
     val packageName: String,
     val displayName: String,
-    val category: AppCategory
+    val category: AppCategory,
+    val isSystemApp: Boolean = false
 )
 
 /** Coarse app category, derived from the OS's own `ApplicationInfo.category` classification. */

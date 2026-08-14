@@ -27,6 +27,7 @@ import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
+import com.project.helpcircle.domain.usecase.StartSystemFallbackBreakUseCase
 import com.project.helpcircle.domain.usecase.ValidateNicknameUseCase
 import dagger.Module
 import dagger.Provides
@@ -69,15 +70,24 @@ object UseCaseModule {
         crisisEpisodeTracker: CrisisEpisodeTracker,
         calculateAgencyIndexUseCase: CalculateAgencyIndexUseCase,
         weeklyHistoryRepository: WeeklyHistoryRepository,
-        evaluateSystemFallbackUseCase: EvaluateSystemFallbackUseCase
+        evaluateSystemFallbackUseCase: EvaluateSystemFallbackUseCase,
+        acknowledgeRecoveryUseCase: AcknowledgeRecoveryUseCase,
+        communityRepository: CommunityRepository
     ): DetectLossOfAgencyUseCase = DetectLossOfAgencyUseCase(
         agencyDetectionEngine,
         agencyRepository,
         crisisEpisodeTracker,
         calculateAgencyIndexUseCase,
         weeklyHistoryRepository,
-        evaluateSystemFallbackUseCase
+        evaluateSystemFallbackUseCase,
+        acknowledgeRecoveryUseCase,
+        communityRepository
     )
+
+    @Provides
+    fun provideStartSystemFallbackBreakUseCase(
+        crisisEpisodeTracker: CrisisEpisodeTracker
+    ): StartSystemFallbackBreakUseCase = StartSystemFallbackBreakUseCase(crisisEpisodeTracker)
 
     @Provides
     @Singleton
