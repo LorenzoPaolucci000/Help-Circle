@@ -32,6 +32,24 @@ class ForegroundAppTracker {
     var isCurrentForegroundAppBlacklisted: Boolean = false
         private set
 
+    /**
+     * Whether [packageName] is an app this tracker has no current knowledge of, meaning its
+     * blacklist status still has to be looked up before [isCurrentForegroundAppBlacklisted] can be
+     * trusted for it.
+     *
+     * Needed because window transitions are not a complete signal on their own: this tracker only
+     * learns the foreground app from them, yet none is ever dispatched when the accessibility
+     * service starts while a monitored app is *already* on screen. That happens routinely — the OS
+     * restarts the service after an app update, after a crash, and after the OEM battery manager
+     * revokes and restores it — and each time detection would otherwise silently do nothing for the
+     * app in front of the user until they navigated away and back. Observing which app a scroll
+     * event actually came from closes that gap. Deliberately compares against the tracked package
+     * rather than only checking for "nothing tracked yet", because this tracker outlives the
+     * service (it's a process-wide singleton), so after a service restart it can hold a stale
+     * package rather than none at all.
+     */
+    fun needsForegroundResolution(packageName: String): Boolean = currentPackageName != packageName
+
     fun onForegroundPackageChanged(packageName: String, atEpochMillis: Long, isBlacklisted: Boolean) {
         currentPackageName = packageName
         isCurrentForegroundAppBlacklisted = isBlacklisted

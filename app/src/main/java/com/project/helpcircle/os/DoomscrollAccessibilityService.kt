@@ -39,7 +39,10 @@ import kotlinx.coroutines.launch
  * monitor is ever inspected this way, never a system-wide scan. That same recorded result is what
  * scopes crisis detection itself: scroll/tap events are only processed while
  * [ForegroundAppTracker.isCurrentForegroundAppBlacklisted] is true, so an empty blacklist means
- * nothing is watched at all.
+ * nothing is watched at all. A scroll event's own package name is used as a second foreground
+ * signal (see [ForegroundAppTracker.needsForegroundResolution]), because no window transition
+ * arrives when this service (re)connects while a monitored app is already on screen — which the OS
+ * causes routinely, and which otherwise leaves detection silently inert for that app.
  *
  * Runs itself as a foreground service with a silent, persistent notification so aggressive OEM
  * battery managers are less likely to kill it while it's the only thing keeping the doomscroll
@@ -127,6 +130,18 @@ class DoomscrollAccessibilityService : AccessibilityService() {
         try {
             when (event.eventType) {
                 AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                    val scrollingPackageName = event.packageName?.toString() ?: return
+                    // A scroll event names the app it came from, so it doubles as a foreground-app
+                    // signal — and it's the only one available when this service (re)connects while
+                    // a monitored app is already on screen, since no window transition follows.
+                    // Without this, every scroll in that app is gated out below and detection
+                    // silently does nothing until the user navigates away and back. Resolving the
+                    // blacklist status costs one suspending lookup, so this event is dropped and the
+                    // next one through is gated on the answer.
+                    if (foregroundAppTracker.needsForegroundResolution(scrollingPackageName)) {
+                        serviceScope.launch { handleForegroundPackageChanged(scrollingPackageName) }
+                        return
+                    }
                     // Only scroll activity in an app the user opted to monitor should ever feed
                     // crisis detection; an empty blacklist means nothing is being watched, per
                     // ForegroundAppTracker's default-false state before any foreground app is known.
