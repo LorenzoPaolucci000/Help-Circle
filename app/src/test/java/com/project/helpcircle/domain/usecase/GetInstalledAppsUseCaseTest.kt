@@ -70,6 +70,23 @@ class GetInstalledAppsUseCaseTest {
     }
 
     @Test
+    fun `includes every TikTok package variant even when its declared category is wrong`() = runBlocking {
+        // The Lite/Go build is the one actually installed on the project's test device, and used to
+        // be picked up only by its self-declared Social category — the allowlist removes that
+        // dependency for all three shipping ids.
+        val tikTok = AppInfo("com.zhiliaoapp.musically", "TikTok", AppCategory.OTHER)
+        val tikTokLite = AppInfo("com.zhiliaoapp.musically.go", "TikTok Lite", AppCategory.OTHER)
+        val tikTokTrill = AppInfo("com.ss.android.ugc.trill", "TikTok", AppCategory.OTHER)
+        val useCase = GetInstalledAppsUseCase(
+            FakeInstalledAppsRepository(listOf(tikTok, tikTokLite, tikTokTrill))
+        )
+
+        val result = useCase()
+
+        assertEquals(setOf(tikTok, tikTokLite, tikTokTrill), result.toSet())
+    }
+
+    @Test
     fun `excludes a blocklisted package even when its declared category is Social`() = runBlocking {
         val whatsApp = AppInfo("com.whatsapp", "WhatsApp", AppCategory.SOCIAL)
         val useCase = GetInstalledAppsUseCase(FakeInstalledAppsRepository(listOf(whatsApp)))

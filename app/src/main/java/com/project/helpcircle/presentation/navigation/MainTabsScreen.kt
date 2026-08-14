@@ -1,5 +1,9 @@
 package com.project.helpcircle.presentation.navigation
 
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -7,13 +11,19 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.project.helpcircle.presentation.common.MonitoringDisabledBanner
+import com.project.helpcircle.presentation.common.MonitoringStatusViewModel
 import com.project.helpcircle.presentation.community.CommunityDashboardScreen
 import com.project.helpcircle.presentation.home.HomeScreen
 import com.project.helpcircle.presentation.settings.SettingsScreen
@@ -29,9 +39,12 @@ import com.project.helpcircle.presentation.settings.SettingsScreen
 @Composable
 fun MainTabsScreen(
     onLeftCommunity: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    monitoringStatusViewModel: MonitoringStatusViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
+    val isMonitoringActive by monitoringStatusViewModel.isMonitoringActive.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         modifier = modifier,
@@ -56,19 +69,33 @@ fun MainTabsScreen(
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = TabDestination.COMMUNITY.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(TabDestination.ME.route) {
-                HomeScreen()
+        Column(modifier = Modifier.padding(innerPadding)) {
+            // Sits above the tab content rather than inside any one screen: monitoring being off
+            // invalidates what all three tabs are showing, so it shouldn't be dismissible by
+            // switching tabs.
+            if (!isMonitoringActive) {
+                MonitoringDisabledBanner(
+                    onTurnBackOnClicked = {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
-            composable(TabDestination.COMMUNITY.route) {
-                CommunityDashboardScreen()
-            }
-            composable(TabDestination.SETTINGS.route) {
-                SettingsScreen(onLeftCommunity = onLeftCommunity)
+            NavHost(
+                navController = navController,
+                startDestination = TabDestination.COMMUNITY.route
+            ) {
+                composable(TabDestination.ME.route) {
+                    HomeScreen()
+                }
+                composable(TabDestination.COMMUNITY.route) {
+                    CommunityDashboardScreen()
+                }
+                composable(TabDestination.SETTINGS.route) {
+                    SettingsScreen(onLeftCommunity = onLeftCommunity)
+                }
             }
         }
     }

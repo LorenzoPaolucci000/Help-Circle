@@ -117,31 +117,33 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // TEMPORARY diagnostic logging — unconditional, before any filtering, to compare which
-        // event types (if any) YouTube/TikTok's page-based UI dispatches versus Prime Video's
-        // classic scrollable list. Remove once the real device data is in.
-        Log.e(
-            "HC_VERIFY",
-            "eventType=${event?.eventType} pkg=${event?.packageName} class=${event?.className} " +
-                "contentChangeTypes=${event?.contentChangeTypes} scrollX=${event?.scrollX} scrollY=${event?.scrollY}"
-        )
         if (event == null || event.packageName == packageName) return
-        when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
-                // Only scroll activity in an app the user opted to monitor should ever feed
-                // crisis detection; an empty blacklist means nothing is being watched, per
-                // ForegroundAppTracker's default-false state before any foreground app is known.
-                if (!foregroundAppTracker.isCurrentForegroundAppBlacklisted) return
-                val signal = ScrollSignal(timestampMillis = System.currentTimeMillis())
-                serviceScope.launch {
-                    val result = detectLossOfAgencyUseCase(signal)
-                    if (result.offerSystemFallback) startActivity(SystemFallbackActivity.newIntent(this@DoomscrollAccessibilityService))
+        // This runs synchronously on the main thread, outside serviceScope, so the scope's
+        // CoroutineExceptionHandler can't cover it. Anything thrown here would be an uncaught
+        // exception, and two of those in quick succession is enough for Android to disable the
+        // accessibility service outright — taking doomscroll detection down until the user
+        // notices and re-enables it by hand. Detection dropping a single event is always the
+        // better trade than that.
+        try {
+            when (event.eventType) {
+                AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                    // Only scroll activity in an app the user opted to monitor should ever feed
+                    // crisis detection; an empty blacklist means nothing is being watched, per
+                    // ForegroundAppTracker's default-false state before any foreground app is known.
+                    if (!foregroundAppTracker.isCurrentForegroundAppBlacklisted) return
+                    val signal = ScrollSignal(timestampMillis = System.currentTimeMillis())
+                    serviceScope.launch {
+                        val result = detectLossOfAgencyUseCase(signal)
+                        if (result.offerSystemFallback) startActivity(SystemFallbackActivity.newIntent(this@DoomscrollAccessibilityService))
+                    }
+                }
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                    val foregroundPackageName = event.packageName?.toString() ?: return
+                    serviceScope.launch { handleForegroundPackageChanged(foregroundPackageName) }
                 }
             }
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                val foregroundPackageName = event.packageName?.toString() ?: return
-                serviceScope.launch { handleForegroundPackageChanged(foregroundPackageName) }
-            }
+        } catch (throwable: Throwable) {
+            Log.w(TAG, "Dropped an accessibility event after an unexpected failure", throwable)
         }
     }
 
@@ -155,5 +157,9 @@ class DoomscrollAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val TAG = "DoomscrollService"
     }
 }

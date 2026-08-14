@@ -30,11 +30,19 @@ class GetInstalledAppsUseCase(
             .sortedBy { it.displayName.lowercase() }
 
     private companion object {
-        /** Feed/short-video apps whose OS-declared category isn't reliably Social or Video. */
+        /**
+         * Feed/short-video apps whose OS-declared category isn't reliably Social or Video.
+         * TikTok is listed under all three of its shipping package ids — the global build, the
+         * Lite/Go build (confirmed installed on the project's test device, where it was only picked
+         * up by its Social category declaration) and the regional/alternate build — so none of them
+         * depends on that self-declared category staying correct.
+         */
         val ALLOWED_PACKAGE_NAMES = setOf(
             "com.google.android.youtube", // YouTube (incl. Shorts)
             "com.instagram.android", // Instagram
-            "com.zhiliaoapp.musically", // TikTok
+            "com.zhiliaoapp.musically", // TikTok (global)
+            "com.zhiliaoapp.musically.go", // TikTok Lite
+            "com.ss.android.ugc.trill", // TikTok (regional/alternate build)
             "com.twitter.android", // X (Twitter)
             "com.facebook.katana" // Facebook
         )
