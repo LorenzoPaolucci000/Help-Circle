@@ -12,6 +12,7 @@ import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
+import com.project.helpcircle.domain.repository.WeeklySatisfactionRepository
 import com.project.helpcircle.domain.usecase.AcknowledgeRecoveryUseCase
 import com.project.helpcircle.domain.usecase.CalculateAgencyIndexUseCase
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
@@ -28,8 +29,10 @@ import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
+import com.project.helpcircle.domain.usecase.ObserveWeeklySatisfactionUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
 import com.project.helpcircle.domain.usecase.StartSystemFallbackBreakUseCase
+import com.project.helpcircle.domain.usecase.SubmitWeeklySatisfactionUseCase
 import com.project.helpcircle.domain.usecase.ValidateNicknameUseCase
 import dagger.Module
 import dagger.Provides
@@ -192,4 +195,16 @@ object UseCaseModule {
     fun provideIsFocusModeActiveUseCase(
         foregroundAppTracker: ForegroundAppTracker
     ): IsFocusModeActiveUseCase = IsFocusModeActiveUseCase(foregroundAppTracker)
+
+    @Provides
+    fun provideObserveWeeklySatisfactionUseCase(
+        weeklySatisfactionRepository: WeeklySatisfactionRepository
+    ): ObserveWeeklySatisfactionUseCase = ObserveWeeklySatisfactionUseCase(weeklySatisfactionRepository)
+
+    @Provides
+    fun provideSubmitWeeklySatisfactionUseCase(
+        weeklySatisfactionRepository: WeeklySatisfactionRepository,
+        communityRepository: CommunityRepository
+    ): SubmitWeeklySatisfactionUseCase =
+        SubmitWeeklySatisfactionUseCase(weeklySatisfactionRepository, communityRepository)
 }

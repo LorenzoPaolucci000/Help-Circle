@@ -11,6 +11,7 @@ import com.project.helpcircle.data.local.dao.FocusSessionDao
 import com.project.helpcircle.data.local.dao.MonitoredAppDao
 import com.project.helpcircle.data.local.dao.UserIdentityDao
 import com.project.helpcircle.data.local.dao.WeeklyHistoryDao
+import com.project.helpcircle.data.local.dao.WeeklySatisfactionDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -54,4 +55,8 @@ object DatabaseModule {
     @Provides
     fun provideCommunityWeeklyHistoryDao(database: AppDatabase): CommunityWeeklyHistoryDao =
         database.communityWeeklyHistoryDao()
+
+    @Provides
+    fun provideWeeklySatisfactionDao(database: AppDatabase): WeeklySatisfactionDao =
+        database.weeklySatisfactionDao()
 }
