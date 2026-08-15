@@ -19,7 +19,8 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val currentAgencyIndex: Int = AgencyIndex.baseline().value,
     val weeklyDeltasOldestFirst: List<Int> = emptyList(),
-    val latestWeeklySummary: WeeklySummary? = null
+    val latestWeeklySummary: WeeklySummary? = null,
+    val previousWeeklySummary: WeeklySummary? = null
 )
 
 @HiltViewModel
@@ -38,7 +39,8 @@ class HomeViewModel @Inject constructor(
                         isLoading = false,
                         currentAgencyIndex = summary.currentIndex.value,
                         weeklyDeltasOldestFirst = summary.weeklySummariesOldestFirst.map { weekly -> weekly.agencyIndexDelta },
-                        latestWeeklySummary = summary.latestWeeklySummary
+                        latestWeeklySummary = summary.latestWeeklySummary,
+                        previousWeeklySummary = summary.previousWeeklySummary
                     )
                 }
             }

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,6 +52,7 @@ private fun HomeContent(uiState: HomeUiState, modifier: Modifier = Modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
@@ -59,7 +62,10 @@ private fun HomeContent(uiState: HomeUiState, modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(40.dp))
             WeeklyTrendChart(weeklyDeltasOldestFirst = uiState.weeklyDeltasOldestFirst)
             Spacer(modifier = Modifier.height(32.dp))
-            LatestWeeklySummaryCard(summary = uiState.latestWeeklySummary)
+            LatestWeeklySummaryCard(
+                summary = uiState.latestWeeklySummary,
+                previousSummary = uiState.previousWeeklySummary
+            )
         }
     }
 }
@@ -118,9 +124,13 @@ private fun WeeklyTrendChart(weeklyDeltasOldestFirst: List<Int>, modifier: Modif
     }
 }
 
-/** Recap of the most recently completed week: when crises peaked and which intervention helped most. */
+/** Recap of the most recently completed week: when crises peaked and which intervention helped most, each set against the week before it. */
 @Composable
-private fun LatestWeeklySummaryCard(summary: WeeklySummary?, modifier: Modifier = Modifier) {
+private fun LatestWeeklySummaryCard(
+    summary: WeeklySummary?,
+    previousSummary: WeeklySummary?,
+    modifier: Modifier = Modifier
+) {
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = "Last week", style = MaterialTheme.typography.titleSmall)
@@ -132,10 +142,41 @@ private fun LatestWeeklySummaryCard(summary: WeeklySummary?, modifier: Modifier 
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                Text(text = "Peak crisis hour: ${summary.peakCrisisHour?.let { "$it:00" } ?: "No crises"}")
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "Most effective intervention: ${summary.mostEffectiveInterventionCategory ?: "None"}")
+                WeeklyStatRow(
+                    label = "Peak crisis hour",
+                    value = summary.peakCrisisHour?.let { "$it:00" } ?: "No crises",
+                    previousValue = previousSummary?.let { it.peakCrisisHour?.let { hour -> "$hour:00" } ?: "No crises" }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                WeeklyStatRow(
+                    label = "Most effective intervention",
+                    value = summary.mostEffectiveInterventionCategory ?: "None",
+                    previousValue = previousSummary?.let { it.mostEffectiveInterventionCategory ?: "None" }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                WeeklyStatRow(
+                    label = "Agency trend",
+                    value = summary.agencyIndexDelta.toSignedString(),
+                    previousValue = previousSummary?.agencyIndexDelta?.toSignedString()
+                )
             }
         }
     }
 }
+
+/** One "Last week" stat, with an optional caption comparing it to the week before that. */
+@Composable
+private fun WeeklyStatRow(label: String, value: String, previousValue: String?, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(text = "$label: $value")
+        if (previousValue != null) {
+            Text(
+                text = "The week before: $previousValue",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun Int.toSignedString(): String = if (this >= 0) "+$this" else toString()

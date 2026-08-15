@@ -71,6 +71,7 @@ class HomeViewModelTest {
         assertEquals(65, viewModel.uiState.value.currentAgencyIndex)
         assertEquals(emptyList<Int>(), viewModel.uiState.value.weeklyDeltasOldestFirst)
         assertNull(viewModel.uiState.value.latestWeeklySummary)
+        assertNull(viewModel.uiState.value.previousWeeklySummary)
     }
 
     @Test
@@ -86,5 +87,22 @@ class HomeViewModelTest {
 
         assertEquals(listOf(5, -3), viewModel.uiState.value.weeklyDeltasOldestFirst)
         assertEquals(newest, viewModel.uiState.value.latestWeeklySummary)
+        assertEquals(oldest, viewModel.uiState.value.previousWeeklySummary)
+    }
+
+    @Test
+    fun `previous summary is the second-most-recent week, not merely the oldest`() {
+        val oldest = WeeklySummary(weekStartEpochMillis = 1_000, agencyIndexDelta = 5, mostEffectiveInterventionCategory = "Text", peakCrisisHour = 22)
+        val middle = WeeklySummary(weekStartEpochMillis = 2_000, agencyIndexDelta = 2, mostEffectiveInterventionCategory = "Haptic", peakCrisisHour = 21)
+        val newest = WeeklySummary(weekStartEpochMillis = 3_000, agencyIndexDelta = -3, mostEffectiveInterventionCategory = "Blur", peakCrisisHour = 23)
+        val useCase = ObserveAgencyHomeUseCase(
+            HomeViewModelFakeAgencyRepository(AgencyIndex.baseline()),
+            HomeViewModelFakeWeeklyHistoryRepository(listOf(newest, oldest, middle))
+        )
+
+        val viewModel = HomeViewModel(useCase)
+
+        assertEquals(newest, viewModel.uiState.value.latestWeeklySummary)
+        assertEquals(middle, viewModel.uiState.value.previousWeeklySummary)
     }
 }
