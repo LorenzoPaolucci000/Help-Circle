@@ -44,7 +44,10 @@ fun SelectMonitoredAppsScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(uiState.isDone) {
-        if (uiState.isDone) onContinue()
+        if (uiState.isDone) {
+            onContinue()
+            viewModel.onDoneHandled()
+        }
     }
 
     SelectMonitoredAppsContent(

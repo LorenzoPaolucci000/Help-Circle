@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.community.JoinCommunityScreen
+import com.project.helpcircle.presentation.onboarding.AccessibilityPermissionScreen
 import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
 import com.project.helpcircle.presentation.onboarding.SelectMonitoredAppsScreen
 import com.project.helpcircle.presentation.startup.StartupDestination
@@ -51,15 +52,28 @@ fun HelpCircleNavHost(
                     // Reached either from onboarding (NicknameSetup already popped away, nothing
                     // to return to) or from JoinCommunityScreen's "Go to Settings" banner (pushed
                     // on top, still sitting right below). In the latter case just pop back to that
-                    // existing instance instead of pushing a second one on top of it.
+                    // existing instance instead of pushing a second one on top of it — the
+                    // accessibility permission step only belongs in the first-time onboarding
+                    // path, since reaching this screen via the banner means onboarding (and that
+                    // permission grant) already happened once before.
                     if (navController.previousBackStackEntry?.destination?.route == Destination.JoinCommunity.route) {
                         navController.popBackStack()
                     } else {
-                        navController.navigate(Destination.JoinCommunity.route) {
-                            popUpTo(Destination.SelectMonitoredApps.route) { inclusive = true }
-                        }
+                        // No popUpTo here: this screen stays on the back stack so
+                        // AccessibilityPermissionScreen's "Back" button has somewhere to return to.
+                        navController.navigate(Destination.AccessibilityPermission.route)
                     }
                 }
+            )
+        }
+        composable(Destination.AccessibilityPermission.route) {
+            AccessibilityPermissionScreen(
+                onContinue = {
+                    navController.navigate(Destination.JoinCommunity.route) {
+                        popUpTo(Destination.SelectMonitoredApps.route) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
         composable(Destination.JoinCommunity.route) {

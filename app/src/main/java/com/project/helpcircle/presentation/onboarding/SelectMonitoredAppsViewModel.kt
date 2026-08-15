@@ -77,4 +77,9 @@ class SelectMonitoredAppsViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = false, isDone = true) }
         }
     }
+
+    /** Consumes the one-shot [SelectMonitoredAppsUiState.isDone] navigation event so returning to this screen later (e.g. via a Back button further along the flow) doesn't immediately re-trigger it. */
+    fun onDoneHandled() {
+        _uiState.update { it.copy(isDone = false) }
+    }
 }
