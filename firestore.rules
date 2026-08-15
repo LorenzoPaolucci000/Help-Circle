@@ -26,17 +26,30 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/communities/$(communityId)/members/$(request.auth.uid));
 
         // A member may only ever write their own entry, and only nickname/status/agencyScore/
-        // lastSeen — never anything else, per the Zero-PII rule. agencyScore is a derived 0-100
-        // IA_ind value, not behavioral data, so sharing it doesn't violate Zero-PII.
+        // satisfaction/satisfactionWeekStart/lastSeen — never anything else, per the Zero-PII
+        // rule. agencyScore is a derived 0-100 IA_ind value, not behavioral data, and satisfaction
+        // is a self-declared weekly mood rating, so sharing either doesn't violate Zero-PII.
+        //
+        // Every field is optional here rather than required: this document is built up by two
+        // independent merge writes (the roster fields, and the satisfaction rating), so either can
+        // legitimately land on its own. Each field is therefore validated only when present.
         allow create, update: if request.auth != null
           && request.auth.uid == memberId
-          && request.resource.data.keys().hasOnly(['nickname', 'status', 'agencyScore', 'lastSeen'])
-          && request.resource.data.nickname is string
-          && request.resource.data.nickname.size() <= 20
-          && request.resource.data.status in ['ok', 'at_risk', 'crisis']
-          && request.resource.data.agencyScore is int
-          && request.resource.data.agencyScore >= 0
-          && request.resource.data.agencyScore <= 100;
+          && request.resource.data.keys().hasOnly(
+               ['nickname', 'status', 'agencyScore', 'satisfaction', 'satisfactionWeekStart', 'lastSeen'])
+          && (!('nickname' in request.resource.data.keys())
+               || (request.resource.data.nickname is string
+                   && request.resource.data.nickname.size() <= 20))
+          && (!('status' in request.resource.data.keys())
+               || request.resource.data.status in ['ok', 'at_risk', 'crisis'])
+          && (!('agencyScore' in request.resource.data.keys())
+               || (request.resource.data.agencyScore is int
+                   && request.resource.data.agencyScore >= 0
+                   && request.resource.data.agencyScore <= 100))
+          && (!('satisfaction' in request.resource.data.keys())
+               || request.resource.data.satisfaction in ['bad', 'neutral', 'happy'])
+          && (!('satisfactionWeekStart' in request.resource.data.keys())
+               || request.resource.data.satisfactionWeekStart is int);
 
         // Leaving a community removes only the caller's own roster entry.
         allow delete: if request.auth != null && request.auth.uid == memberId;

@@ -12,6 +12,7 @@ import com.project.helpcircle.domain.model.AgencyIndex
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.MemberStatus
+import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.CommunityWeeklyHistoryRepository
@@ -29,11 +30,13 @@ import kotlinx.coroutines.tasks.await
  * Firestore-backed [CommunityRepository]. The privacy filter below caps what ever leaves the
  * device: the community-wide event stream carries only [FIELD_TYPE], [FIELD_COMMUNITY_ID] and
  * [FIELD_SENDER_ID] (an anonymous UID); the per-member roster under [MEMBERS_COLLECTION] carries
- * only a self-chosen [FIELD_NICKNAME], a coarse [FIELD_STATUS] tier, and the derived
- * [FIELD_AGENCY_SCORE] (0-100), visible to fellow members of the same community only. Never sent:
- * app names, scroll data, usage durations, or usage timestamps, per the Zero-PII rule —
- * `agencyScore` is a derived index, not behavioral data, and reveals nothing about which app,
- * duration, or activity produced it.
+ * only a self-chosen [FIELD_NICKNAME], a coarse [FIELD_STATUS] tier, the derived
+ * [FIELD_AGENCY_SCORE] (0-100), and the self-declared [FIELD_SATISFACTION] rating with the week it
+ * describes ([FIELD_SATISFACTION_WEEK_START]), visible to fellow members of the same community
+ * only. Never sent: app names, scroll data, usage durations, or usage timestamps, per the Zero-PII
+ * rule — `agencyScore` is a derived index, not behavioral data, and reveals nothing about which
+ * app, duration, or activity produced it, while `satisfaction` is an opinion the user typed in
+ * themselves rather than anything observed about them.
  *
  * [observeCommunityState] is a cold Firestore snapshot listener: it starts on subscription and
  * is torn down when the collecting coroutine is cancelled, so a lifecycle-aware collector (e.g.
@@ -153,6 +156,25 @@ class CommunityRepositoryImpl @Inject constructor(
     override suspend fun reportRecovery(communityId: String): Unit = retryingOnUnauthenticated {
         writeEvent(communityId, EVENT_TYPE_RECOVERY_REPORTED)
         writeOwnMemberDoc(communityId, MemberStatus.OK)
+    }
+
+    override suspend fun publishSatisfaction(
+        communityId: String,
+        weekStartEpochMillis: Long,
+        satisfaction: WeeklySatisfaction
+    ): Unit = retryingOnUnauthenticated {
+        val identity = userRepository.getOrCreateIdentity()
+        // A merge write of just these two fields: nickname/status/agencyScore are owned by
+        // writeOwnMemberDoc and must not be clobbered with stale values from here.
+        communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash)
+            .set(
+                mapOf(
+                    FIELD_SATISFACTION to satisfaction.toFirestoreValue(),
+                    FIELD_SATISFACTION_WEEK_START to weekStartEpochMillis
+                ),
+                SetOptions.merge()
+            )
+            .await()
     }
 
     override suspend fun leaveCommunity(communityId: String): Unit = retryingOnUnauthenticated {
@@ -304,7 +326,11 @@ class CommunityRepositoryImpl @Inject constructor(
         anonymousId = id,
         nickname = getString(FIELD_NICKNAME).orEmpty(),
         status = (getString(FIELD_STATUS) ?: MemberStatus.OK.toFirestoreValue()).toMemberStatus(),
-        agencyScore = (getLong(FIELD_AGENCY_SCORE) ?: AgencyIndex.BASELINE.toLong()).toInt()
+        agencyScore = (getLong(FIELD_AGENCY_SCORE) ?: AgencyIndex.BASELINE.toLong()).toInt(),
+        // Both stay null for a member who has never rated a week; the week stamp is carried through
+        // as-is so the domain can tell a current-week rating from a leftover one.
+        satisfaction = getString(FIELD_SATISFACTION)?.toWeeklySatisfaction(),
+        satisfactionWeekStartEpochMillis = getLong(FIELD_SATISFACTION_WEEK_START)
     )
 
     private fun MemberStatus.toFirestoreValue(): String = when (this) {
@@ -317,6 +343,20 @@ class CommunityRepositoryImpl @Inject constructor(
         "at_risk" -> MemberStatus.AT_RISK
         "crisis" -> MemberStatus.CRISIS
         else -> MemberStatus.OK
+    }
+
+    private fun WeeklySatisfaction.toFirestoreValue(): String = when (this) {
+        WeeklySatisfaction.BAD -> "bad"
+        WeeklySatisfaction.NEUTRAL -> "neutral"
+        WeeklySatisfaction.HAPPY -> "happy"
+    }
+
+    /** Null rather than a default for an unrecognised value: an unreadable rating must not be counted as a real one. */
+    private fun String.toWeeklySatisfaction(): WeeklySatisfaction? = when (this) {
+        "bad" -> WeeklySatisfaction.BAD
+        "neutral" -> WeeklySatisfaction.NEUTRAL
+        "happy" -> WeeklySatisfaction.HAPPY
+        else -> null
     }
 
     companion object {
@@ -334,6 +374,8 @@ class CommunityRepositoryImpl @Inject constructor(
         private const val FIELD_NICKNAME = "nickname"
         private const val FIELD_STATUS = "status"
         private const val FIELD_AGENCY_SCORE = "agencyScore"
+        private const val FIELD_SATISFACTION = "satisfaction"
+        private const val FIELD_SATISFACTION_WEEK_START = "satisfactionWeekStart"
         private const val FIELD_LAST_SEEN = "lastSeen"
         private const val FIELD_INVITE_CODE = "inviteCode"
 

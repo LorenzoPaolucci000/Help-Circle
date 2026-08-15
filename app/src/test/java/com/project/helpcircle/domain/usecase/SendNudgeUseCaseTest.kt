@@ -5,6 +5,7 @@ import com.project.helpcircle.domain.model.ChargeWallet
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.UserIdentity
+import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
@@ -40,6 +41,11 @@ private class SendNudgeFakeCommunityRepository(private val memberCount: Int) : C
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
+    override suspend fun publishSatisfaction(
+        communityId: String,
+        weekStartEpochMillis: Long,
+        satisfaction: WeeklySatisfaction
+    ) = Unit
     override suspend fun leaveCommunity(communityId: String) = Unit
     override suspend fun getActiveCommunityId(): String? = null
     override suspend fun getMemberCount(communityId: String): Int = memberCount

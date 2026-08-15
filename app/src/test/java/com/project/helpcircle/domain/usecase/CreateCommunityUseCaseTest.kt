@@ -1,6 +1,7 @@
 package com.project.helpcircle.domain.usecase
 
 import com.project.helpcircle.domain.model.CommunityState
+import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,11 @@ private class CreateCommunityFakeRepository(var throwOnCreate: Boolean = false) 
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
+    override suspend fun publishSatisfaction(
+        communityId: String,
+        weekStartEpochMillis: Long,
+        satisfaction: WeeklySatisfaction
+    ) = Unit
     override suspend fun leaveCommunity(communityId: String) = Unit
     override suspend fun getActiveCommunityId(): String? = null
     override suspend fun getMemberCount(communityId: String): Int = 0

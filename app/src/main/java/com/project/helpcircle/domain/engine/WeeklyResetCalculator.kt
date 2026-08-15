@@ -31,6 +31,15 @@ object WeeklyResetCalculator {
         mostRecentResetBoundaryMillis(nowEpochMillis, zoneId) - WEEK_DURATION_MILLIS
 
     /**
+     * The start of the week currently in progress at [nowEpochMillis] — i.e. the boundary the
+     * running week began at, one week later than [mostRecentWeekStartEpochMillis], which refers to
+     * the last week to have *closed*. Used to stamp and match weekly satisfaction ratings, which
+     * describe the week the user is living through rather than a completed one.
+     */
+    fun currentWeekStartEpochMillis(nowEpochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): Long =
+        mostRecentResetBoundaryMillis(nowEpochMillis, zoneId)
+
+    /**
      * Whether a new weekly snapshot should be recorded, given the start of the last week this
      * device recorded one for (or null if it never has) and the current time. True at most once
      * per boundary — pulled out as pure logic so callers with a local-storage lazy-snapshot

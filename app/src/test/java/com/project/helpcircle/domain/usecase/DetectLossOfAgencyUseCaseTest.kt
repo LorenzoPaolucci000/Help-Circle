@@ -11,6 +11,7 @@ import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.CrisisEpisodeRecord
 import com.project.helpcircle.domain.model.FocusSession
 import com.project.helpcircle.domain.model.WeeklySummary
+import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
@@ -80,6 +81,11 @@ private class DetectLossFakeCommunityRepository(
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
+    override suspend fun publishSatisfaction(
+        communityId: String,
+        weekStartEpochMillis: Long,
+        satisfaction: WeeklySatisfaction
+    ) = Unit
     override suspend fun leaveCommunity(communityId: String) = Unit
     override suspend fun getActiveCommunityId(): String? = activeCommunityId
     override suspend fun getMemberCount(communityId: String): Int = memberCount

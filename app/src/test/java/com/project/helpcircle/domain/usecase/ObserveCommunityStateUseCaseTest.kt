@@ -4,6 +4,7 @@ import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityObservation
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.MemberStatus
+import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.CommunityRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,11 @@ private class ObserveCommunityStateFakeRepository(
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
+    override suspend fun publishSatisfaction(
+        communityId: String,
+        weekStartEpochMillis: Long,
+        satisfaction: WeeklySatisfaction
+    ) = Unit
     override suspend fun leaveCommunity(communityId: String) = Unit
     override suspend fun getActiveCommunityId(): String? = null
     override suspend fun getMemberCount(communityId: String): Int = stateFlow.value.members.size

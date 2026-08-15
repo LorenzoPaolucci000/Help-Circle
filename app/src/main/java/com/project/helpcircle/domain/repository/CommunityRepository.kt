@@ -1,6 +1,7 @@
 package com.project.helpcircle.domain.repository
 
 import com.project.helpcircle.domain.model.CommunityState
+import com.project.helpcircle.domain.model.WeeklySatisfaction
 import kotlinx.coroutines.flow.Flow
 
 /** Manages membership in and observation of a support community's [CommunityState]. */
@@ -22,6 +23,18 @@ interface CommunityRepository {
 
     suspend fun reportCrisis(communityId: String)
     suspend fun reportRecovery(communityId: String)
+
+    /**
+     * Publishes this device's own self-reported satisfaction rating for the week starting at
+     * [weekStartEpochMillis] to its roster entry, so peers can see it aggregated on the community
+     * dashboard. The week stamp travels with the rating so a stale one is recognisable as stale
+     * rather than silently counted toward a later week.
+     */
+    suspend fun publishSatisfaction(
+        communityId: String,
+        weekStartEpochMillis: Long,
+        satisfaction: WeeklySatisfaction
+    )
 
     /** Removes this device's own roster entry from [communityId] and forgets it as the active community. */
     suspend fun leaveCommunity(communityId: String)
