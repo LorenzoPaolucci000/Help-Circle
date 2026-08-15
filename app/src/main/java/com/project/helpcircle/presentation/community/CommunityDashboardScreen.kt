@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -100,11 +102,19 @@ private fun CommunityDashboardContent(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     CollectiveIndexDisplay(collectiveIndex = if (uiState.isSolo) null else uiState.collectiveIndex)
+                    if (!uiState.isSolo && uiState.latestWeeklyCollectiveIndex != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        CommunityWeeklyTrendCaption(
+                            latest = uiState.latestWeeklyCollectiveIndex,
+                            previous = uiState.previousWeeklyCollectiveIndex
+                        )
+                    }
                     Spacer(modifier = Modifier.height(40.dp))
                     if (uiState.isSolo) {
                         EmptyPeersState()
@@ -238,6 +248,29 @@ private fun CollectiveIndexDisplay(collectiveIndex: Int?, modifier: Modifier = M
             fontSize = 16.sp,
             color = Color.White.copy(alpha = 0.85f)
         )
+    }
+}
+
+/**
+ * "Vs. last week" caption for the community's IA_comm, built from snapshots this device has
+ * recorded locally — see [ObserveCommunityWeeklyTrendUseCase][com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase]
+ * for why this can differ from what a peer's own device shows.
+ */
+@Composable
+private fun CommunityWeeklyTrendCaption(latest: Int, previous: Int?, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Last week: $latest",
+            fontSize = 14.sp,
+            color = Color.White.copy(alpha = 0.85f)
+        )
+        if (previous != null) {
+            Text(
+                text = "The week before: $previous",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+        }
     }
 }
 

@@ -11,6 +11,7 @@ import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.usecase.NudgeResult
 import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
+import com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +40,8 @@ data class CommunityDashboardUiState(
     val collectiveIndex: Int = 50,
     val visualLandscape: VisualLandscape = VisualLandscape.MISTY,
     val members: List<CommunityMember> = emptyList(),
+    val latestWeeklyCollectiveIndex: Int? = null,
+    val previousWeeklyCollectiveIndex: Int? = null,
     val latestNudge: Nudge? = null,
     val availableCharges: Int = ChargeWallet.MAX_CHARGES,
     val nudgeTarget: CommunityMember? = null,
@@ -51,6 +54,7 @@ class CommunityDashboardViewModel @Inject constructor(
     private val communityRepository: CommunityRepository,
     private val observeChargeWallet: ObserveChargeWalletUseCase,
     private val observeCommunityState: ObserveCommunityStateUseCase,
+    private val observeCommunityWeeklyTrend: ObserveCommunityWeeklyTrendUseCase,
     private val observeIncomingNudges: ObserveIncomingNudgesUseCase,
     private val sendNudge: SendNudgeUseCase
 ) : ViewModel() {
@@ -103,6 +107,17 @@ class CommunityDashboardViewModel @Inject constructor(
                                 members = emptyList()
                             )
                         }
+                    }
+                }
+                .launchIn(listenerScope)
+
+            observeCommunityWeeklyTrend(communityId)
+                .onEach { trend ->
+                    _uiState.update {
+                        it.copy(
+                            latestWeeklyCollectiveIndex = trend.latest?.collectiveIndexValue,
+                            previousWeeklyCollectiveIndex = trend.previous?.collectiveIndexValue
+                        )
                     }
                 }
                 .launchIn(listenerScope)

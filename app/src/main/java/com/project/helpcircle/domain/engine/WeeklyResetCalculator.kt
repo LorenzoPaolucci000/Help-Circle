@@ -26,6 +26,26 @@ object WeeklyResetCalculator {
         return boundary.toInstant().toEpochMilli()
     }
 
+    /** The start (rather than end) of the week most recently closed at or before [nowEpochMillis] — the same convention [WeeklySummary.weekStartEpochMillis] uses. */
+    fun mostRecentWeekStartEpochMillis(nowEpochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): Long =
+        mostRecentResetBoundaryMillis(nowEpochMillis, zoneId) - WEEK_DURATION_MILLIS
+
+    /**
+     * Whether a new weekly snapshot should be recorded, given the start of the last week this
+     * device recorded one for (or null if it never has) and the current time. True at most once
+     * per boundary — pulled out as pure logic so callers with a local-storage lazy-snapshot
+     * pattern (e.g. the community's IA_comm history) can unit-test the decision without a Room
+     * dependency, the same gap the individual IA_ind's own lazy reset left untested.
+     */
+    fun shouldRecordNewWeeklySnapshot(
+        latestRecordedWeekStartEpochMillis: Long?,
+        nowEpochMillis: Long,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): Boolean {
+        val mostRecentWeekStart = mostRecentWeekStartEpochMillis(nowEpochMillis, zoneId)
+        return latestRecordedWeekStartEpochMillis == null || latestRecordedWeekStartEpochMillis < mostRecentWeekStart
+    }
+
     /**
      * Builds the recap for the week ending at [weekEndEpochMillis]: [agencyIndexDelta] is this
      * device's own IA_ind trend across the week (see [WeeklySummary]'s own doc for why); the

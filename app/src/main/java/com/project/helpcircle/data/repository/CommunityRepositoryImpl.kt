@@ -14,6 +14,7 @@ import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.CommunityWeeklyHistoryRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -46,12 +48,19 @@ class CommunityRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val userRepository: UserRepository,
     private val agencyRepository: AgencyRepository,
-    private val activeCommunityDao: ActiveCommunityDao
+    private val activeCommunityDao: ActiveCommunityDao,
+    private val communityWeeklyHistoryRepository: CommunityWeeklyHistoryRepository
 ) : CommunityRepository {
 
     override fun observeCommunityState(communityId: String): Flow<CommunityState> =
         combine(observeCommunityDoc(communityId), observeMembers(communityId)) { doc, members ->
             doc.toCommunityState(communityId, members)
+        }.onEach { state ->
+            // Lazy catch-up snapshot, same no-background-job pattern as the individual IA_ind's
+            // own weekly reset: IA_comm is never archived server-side, so the first live update
+            // this device happens to observe after a weekly boundary passes is what gets recorded
+            // as that week's community snapshot.
+            communityWeeklyHistoryRepository.ensureWeeklySnapshotApplied(communityId, state.collectiveIndex.value)
         }
 
     override suspend fun joinCommunity(communityId: String): CommunityState = retryingOnUnauthenticated {

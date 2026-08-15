@@ -2,12 +2,14 @@ package com.project.helpcircle.di
 
 import com.project.helpcircle.data.repository.AgencyRepositoryImpl
 import com.project.helpcircle.data.repository.CommunityRepositoryImpl
+import com.project.helpcircle.data.repository.CommunityWeeklyHistoryRepositoryImpl
 import com.project.helpcircle.data.repository.MonitoredAppsRepositoryImpl
 import com.project.helpcircle.data.repository.NudgeRepositoryImpl
 import com.project.helpcircle.data.repository.UserRepositoryImpl
 import com.project.helpcircle.data.repository.WeeklyHistoryRepositoryImpl
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.CommunityWeeklyHistoryRepository
 import com.project.helpcircle.domain.repository.InstalledAppsRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.MonitoringStatusRepository
@@ -34,6 +36,11 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindCommunityRepository(impl: CommunityRepositoryImpl): CommunityRepository
+
+    @Binds
+    abstract fun bindCommunityWeeklyHistoryRepository(
+        impl: CommunityWeeklyHistoryRepositoryImpl
+    ): CommunityWeeklyHistoryRepository
 
     @Binds
     abstract fun bindNudgeRepository(impl: NudgeRepositoryImpl): NudgeRepository

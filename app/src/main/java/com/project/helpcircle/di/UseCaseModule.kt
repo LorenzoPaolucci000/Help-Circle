@@ -6,6 +6,7 @@ import com.project.helpcircle.domain.engine.ForegroundAppTracker
 import com.project.helpcircle.domain.engine.SystemFallbackEvaluator
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.CommunityWeeklyHistoryRepository
 import com.project.helpcircle.domain.repository.InstalledAppsRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
@@ -25,6 +26,7 @@ import com.project.helpcircle.domain.usecase.LeaveCommunityUseCase
 import com.project.helpcircle.domain.usecase.ObserveAgencyHomeUseCase
 import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
+import com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
 import com.project.helpcircle.domain.usecase.StartSystemFallbackBreakUseCase
@@ -124,6 +126,11 @@ object UseCaseModule {
     fun provideObserveCommunityStateUseCase(
         communityRepository: CommunityRepository
     ): ObserveCommunityStateUseCase = ObserveCommunityStateUseCase(communityRepository)
+
+    @Provides
+    fun provideObserveCommunityWeeklyTrendUseCase(
+        communityWeeklyHistoryRepository: CommunityWeeklyHistoryRepository
+    ): ObserveCommunityWeeklyTrendUseCase = ObserveCommunityWeeklyTrendUseCase(communityWeeklyHistoryRepository)
 
     @Provides
     fun provideObserveIncomingNudgesUseCase(

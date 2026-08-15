@@ -6,6 +6,7 @@ import com.project.helpcircle.data.local.SqlCipherPassphraseProvider
 import com.project.helpcircle.data.local.dao.ActiveCommunityDao
 import com.project.helpcircle.data.local.dao.AgencyStateDao
 import com.project.helpcircle.data.local.dao.ChargeWalletDao
+import com.project.helpcircle.data.local.dao.CommunityWeeklyHistoryDao
 import com.project.helpcircle.data.local.dao.FocusSessionDao
 import com.project.helpcircle.data.local.dao.MonitoredAppDao
 import com.project.helpcircle.data.local.dao.UserIdentityDao
@@ -49,4 +50,8 @@ object DatabaseModule {
 
     @Provides
     fun provideWeeklyHistoryDao(database: AppDatabase): WeeklyHistoryDao = database.weeklyHistoryDao()
+
+    @Provides
+    fun provideCommunityWeeklyHistoryDao(database: AppDatabase): CommunityWeeklyHistoryDao =
+        database.communityWeeklyHistoryDao()
 }

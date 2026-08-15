@@ -4,16 +4,19 @@ import com.project.helpcircle.domain.engine.ForegroundAppTracker
 import com.project.helpcircle.domain.model.ChargeWallet
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityState
+import com.project.helpcircle.domain.model.CommunityWeeklySummary
 import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.UserIdentity
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.CommunityWeeklyHistoryRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.IsFocusModeActiveUseCase
 import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
+import com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +65,14 @@ private class DashboardFakeUserRepository(currentCharges: Int) : UserRepository 
     }
 }
 
+private class DashboardFakeCommunityWeeklyHistoryRepository(
+    initialSummaries: List<CommunityWeeklySummary> = emptyList()
+) : CommunityWeeklyHistoryRepository {
+    private val summariesFlow = MutableStateFlow(initialSummaries)
+    override fun weeklySummaries(communityId: String): Flow<List<CommunityWeeklySummary>> = summariesFlow
+    override suspend fun ensureWeeklySnapshotApplied(communityId: String, currentCollectiveIndexValue: Int) = Unit
+}
+
 private class DashboardFakeNudgeRepository : NudgeRepository {
     val incomingFlow = MutableSharedFlow<Nudge>(extraBufferCapacity = 1)
     var lastSentTarget: String? = null
@@ -93,7 +104,8 @@ class CommunityDashboardViewModelTest {
     private fun viewModel(
         communityRepository: CommunityRepository,
         userRepository: UserRepository = DashboardFakeUserRepository(currentCharges = 5),
-        nudgeRepository: NudgeRepository = DashboardFakeNudgeRepository()
+        nudgeRepository: NudgeRepository = DashboardFakeNudgeRepository(),
+        communityWeeklyHistoryRepository: CommunityWeeklyHistoryRepository = DashboardFakeCommunityWeeklyHistoryRepository()
     ): CommunityDashboardViewModel {
         val consumeCharge = ConsumeChargeUseCase(
             userRepository,
@@ -103,6 +115,7 @@ class CommunityDashboardViewModelTest {
             communityRepository,
             ObserveChargeWalletUseCase(userRepository, IsFocusModeActiveUseCase(ForegroundAppTracker())),
             ObserveCommunityStateUseCase(communityRepository),
+            ObserveCommunityWeeklyTrendUseCase(communityWeeklyHistoryRepository),
             ObserveIncomingNudgesUseCase(nudgeRepository),
             SendNudgeUseCase(nudgeRepository, communityRepository, consumeCharge)
         )
@@ -139,6 +152,30 @@ class CommunityDashboardViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(false, state.isSolo)
         assertEquals(members, state.members)
+    }
+
+    @Test
+    fun `with no recorded weekly history the weekly trend fields are null`() {
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1"))
+
+        val state = viewModel.uiState.value
+        assertNull(state.latestWeeklyCollectiveIndex)
+        assertNull(state.previousWeeklyCollectiveIndex)
+    }
+
+    @Test
+    fun `the latest and previous weekly snapshots are reflected in the ui state`() {
+        val oldest = CommunityWeeklySummary(communityId = "comm-1", weekStartEpochMillis = 1_000, collectiveIndexValue = 55)
+        val newest = CommunityWeeklySummary(communityId = "comm-1", weekStartEpochMillis = 2_000, collectiveIndexValue = 68)
+        val weeklyHistoryRepository = DashboardFakeCommunityWeeklyHistoryRepository(listOf(newest, oldest))
+        val viewModel = viewModel(
+            DashboardFakeCommunityRepository("comm-1"),
+            communityWeeklyHistoryRepository = weeklyHistoryRepository
+        )
+
+        val state = viewModel.uiState.value
+        assertEquals(68, state.latestWeeklyCollectiveIndex)
+        assertEquals(55, state.previousWeeklyCollectiveIndex)
     }
 
     @Test

@@ -9,6 +9,7 @@ import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private val ZONE: ZoneId = ZoneId.of("UTC")
@@ -107,6 +108,51 @@ class WeeklyResetCalculatorTest {
         )
 
         assertEquals("Haptic", summary.mostEffectiveInterventionCategory)
+    }
+
+    @Test
+    fun `most recent week start is one week before the most recent boundary`() {
+        val weekStart = WeeklyResetCalculator.mostRecentWeekStartEpochMillis(SUNDAY_NIGHT_MILLIS, ZONE)
+
+        assertEquals(SUNDAY_NIGHT_MILLIS - WeeklyResetCalculator.WEEK_DURATION_MILLIS, weekStart)
+    }
+
+    @Test
+    fun `a new snapshot should be recorded when none has ever been recorded`() {
+        val shouldRecord = WeeklyResetCalculator.shouldRecordNewWeeklySnapshot(
+            latestRecordedWeekStartEpochMillis = null,
+            nowEpochMillis = SUNDAY_NIGHT_MILLIS,
+            zoneId = ZONE
+        )
+
+        assertTrue(shouldRecord)
+    }
+
+    @Test
+    fun `no new snapshot is needed when one was already recorded for the current week`() {
+        val currentWeekStart = WeeklyResetCalculator.mostRecentWeekStartEpochMillis(SUNDAY_NIGHT_MILLIS, ZONE)
+
+        val shouldRecord = WeeklyResetCalculator.shouldRecordNewWeeklySnapshot(
+            latestRecordedWeekStartEpochMillis = currentWeekStart,
+            nowEpochMillis = SUNDAY_NIGHT_MILLIS,
+            zoneId = ZONE
+        )
+
+        assertEquals(false, shouldRecord)
+    }
+
+    @Test
+    fun `a new snapshot is needed once a fresh boundary has passed since the last recorded one`() {
+        val lastWeekStart = WeeklyResetCalculator.mostRecentWeekStartEpochMillis(SUNDAY_NIGHT_MILLIS, ZONE)
+        val nextSundayNight = SUNDAY_NIGHT_MILLIS + WeeklyResetCalculator.WEEK_DURATION_MILLIS
+
+        val shouldRecord = WeeklyResetCalculator.shouldRecordNewWeeklySnapshot(
+            latestRecordedWeekStartEpochMillis = lastWeekStart,
+            nowEpochMillis = nextSundayNight,
+            zoneId = ZONE
+        )
+
+        assertTrue(shouldRecord)
     }
 
     @Test
