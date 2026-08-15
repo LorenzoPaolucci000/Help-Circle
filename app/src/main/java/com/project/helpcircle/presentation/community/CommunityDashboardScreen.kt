@@ -1,6 +1,7 @@
 package com.project.helpcircle.presentation.community
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.project.helpcircle.domain.model.CommunityMember
+import com.project.helpcircle.domain.model.CommunitySatisfaction
 import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.TextNudgeStyle
@@ -114,6 +117,10 @@ private fun CommunityDashboardContent(
                             latest = uiState.latestWeeklyCollectiveIndex,
                             previous = uiState.previousWeeklyCollectiveIndex
                         )
+                    }
+                    if (!uiState.isSolo && uiState.communitySatisfaction != null) {
+                        Spacer(modifier = Modifier.height(28.dp))
+                        CommunitySatisfactionBar(satisfaction = uiState.communitySatisfaction)
                     }
                     Spacer(modifier = Modifier.height(40.dp))
                     if (uiState.isSolo) {
@@ -272,6 +279,85 @@ private fun CommunityWeeklyTrendCaption(latest: Int, previous: Int?, modifier: M
             )
         }
     }
+}
+
+/**
+ * The circle's collective self-evaluation for the week in progress: a bar whose fill and color
+ * both track the average of the members who have rated it.
+ *
+ * Deliberately distinct from the IA_comm number above it — that one is derived from detected
+ * behavior, this one from what people say about themselves — so the two are never merged into a
+ * single figure even though both land on a 0-100 scale.
+ */
+@Composable
+private fun CommunitySatisfactionBar(satisfaction: CommunitySatisfaction, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Circle mood this week",
+            fontSize = 14.sp,
+            color = Color.White.copy(alpha = 0.85f)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        if (!satisfaction.hasRatings) {
+            Text(
+                text = "Nobody has rated this week yet.",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+            return@Column
+        }
+
+        val targetFraction = satisfaction.averageScore / 100f
+        val animatedFraction by animateFloatAsState(
+            // A floor rather than a true zero: an all-negative week should still read as "a bar
+            // pinned to the bottom", not as a missing element.
+            targetValue = targetFraction.coerceIn(0.03f, 1f),
+            animationSpec = tween(600),
+            label = "satisfactionFill"
+        )
+        val animatedColor by animateColorAsState(
+            targetValue = satisfactionColor(satisfaction.averageScore),
+            animationSpec = tween(600),
+            label = "satisfactionColor"
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(16.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.25f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedFraction)
+                    .fillMaxHeight()
+                    .clip(CircleShape)
+                    .background(animatedColor)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "${satisfactionFace(satisfaction.averageScore)}  " +
+                "${satisfaction.ratedMemberCount} of ${satisfaction.memberCount} rated",
+            fontSize = 12.sp,
+            color = Color.White.copy(alpha = 0.8f)
+        )
+    }
+}
+
+/** Shares the roster's status palette, so "red/amber/green" means the same thing everywhere on this screen. */
+private fun satisfactionColor(averageScore: Int): Color = when {
+    averageScore <= 33 -> Color(0xFFE57373)
+    averageScore <= 66 -> Color(0xFFFFB74D)
+    else -> Color(0xFF66BB6A)
+}
+
+/** The face the circle's average lands closest to, matching the three the home screen offers. */
+private fun satisfactionFace(averageScore: Int): String = when {
+    averageScore <= 33 -> "😞"
+    averageScore <= 66 -> "😐"
+    else -> "😊"
 }
 
 /** Shown in place of the score/roster while this device is the community's only member. */

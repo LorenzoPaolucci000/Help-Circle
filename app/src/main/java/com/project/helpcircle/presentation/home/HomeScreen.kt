@@ -1,6 +1,8 @@
 package com.project.helpcircle.presentation.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.model.WeeklySummary
 import kotlin.math.abs
 
@@ -39,11 +42,19 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    HomeContent(uiState = uiState, modifier = modifier)
+    HomeContent(
+        uiState = uiState,
+        onSatisfactionSelected = viewModel::onSatisfactionSelected,
+        modifier = modifier
+    )
 }
 
 @Composable
-private fun HomeContent(uiState: HomeUiState, modifier: Modifier = Modifier) {
+private fun HomeContent(
+    uiState: HomeUiState,
+    onSatisfactionSelected: (WeeklySatisfaction) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(modifier = modifier.fillMaxSize()) {
         if (uiState.isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -62,6 +73,15 @@ private fun HomeContent(uiState: HomeUiState, modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(40.dp))
             WeeklyTrendChart(weeklyDeltasOldestFirst = uiState.weeklyDeltasOldestFirst)
             Spacer(modifier = Modifier.height(32.dp))
+            // Placed before the retrospective card deliberately: this asks about the week in
+            // progress, whereas "Last week" recaps a finished one.
+            WeeklySatisfactionCard(
+                selected = uiState.currentWeekSatisfaction,
+                isSubmitting = uiState.isSubmittingSatisfaction,
+                error = uiState.satisfactionError,
+                onSelect = onSatisfactionSelected
+            )
+            Spacer(modifier = Modifier.height(16.dp))
             LatestWeeklySummaryCard(
                 summary = uiState.latestWeeklySummary,
                 previousSummary = uiState.previousWeeklySummary
@@ -123,6 +143,116 @@ private fun WeeklyTrendChart(weeklyDeltasOldestFirst: List<Int>, modifier: Modif
         }
     }
 }
+
+/**
+ * The weekly self-evaluation: one tap on an emoji records how the user feels the week in progress
+ * is going. Re-tapping a different face simply replaces the answer, so there's no separate submit
+ * step and no way to get stuck with an answer you regret.
+ */
+@Composable
+private fun WeeklySatisfactionCard(
+    selected: WeeklySatisfaction?,
+    isSubmitting: Boolean,
+    error: String?,
+    onSelect: (WeeklySatisfaction) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "How is this week going?", style = MaterialTheme.typography.titleSmall)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (selected == null) {
+                    "Your circle sees the shared mood — never what caused it."
+                } else {
+                    "Shared with your circle. Tap another face to change it."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                WeeklySatisfaction.entries.forEach { option ->
+                    SatisfactionOption(
+                        option = option,
+                        isSelected = option == selected,
+                        enabled = !isSubmitting,
+                        onClick = { onSelect(option) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            if (error != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+/** One tappable face in the weekly self-evaluation, visibly filled in once it's the chosen one. */
+@Composable
+private fun SatisfactionOption(
+    option: WeeklySatisfaction,
+    isSelected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+            )
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                },
+                shape = shape
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = option.emoji, fontSize = 32.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = option.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+    }
+}
+
+private val WeeklySatisfaction.emoji: String
+    get() = when (this) {
+        WeeklySatisfaction.BAD -> "😞"
+        WeeklySatisfaction.NEUTRAL -> "😐"
+        WeeklySatisfaction.HAPPY -> "😊"
+    }
+
+private val WeeklySatisfaction.label: String
+    get() = when (this) {
+        WeeklySatisfaction.BAD -> "Rough"
+        WeeklySatisfaction.NEUTRAL -> "So-so"
+        WeeklySatisfaction.HAPPY -> "Good"
+    }
 
 /** Recap of the most recently completed week: when crises peaked and which intervention helped most, each set against the week before it. */
 @Composable

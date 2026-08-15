@@ -2,9 +2,11 @@ package com.project.helpcircle.presentation.community
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.helpcircle.domain.engine.WeeklyResetCalculator
 import com.project.helpcircle.domain.model.ChargeWallet
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityObservation
+import com.project.helpcircle.domain.model.CommunitySatisfaction
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.VisualLandscape
 import com.project.helpcircle.domain.repository.CommunityRepository
@@ -42,6 +44,8 @@ data class CommunityDashboardUiState(
     val members: List<CommunityMember> = emptyList(),
     val latestWeeklyCollectiveIndex: Int? = null,
     val previousWeeklyCollectiveIndex: Int? = null,
+    /** How the circle collectively rates the week in progress; null while solo, since one member isn't a community mood. */
+    val communitySatisfaction: CommunitySatisfaction? = null,
     val latestNudge: Nudge? = null,
     val availableCharges: Int = ChargeWallet.MAX_CHARGES,
     val nudgeTarget: CommunityMember? = null,
@@ -95,7 +99,14 @@ class CommunityDashboardViewModel @Inject constructor(
                                 inviteCode = observation.state.inviteCode,
                                 collectiveIndex = observation.state.collectiveIndex.value,
                                 visualLandscape = observation.state.visualLandscape,
-                                members = observation.state.members
+                                members = observation.state.members,
+                                // Recomputed per emission rather than once at subscription, so the
+                                // week it's matched against stays current for a long-lived listener.
+                                communitySatisfaction = CommunitySatisfaction.from(
+                                    members = observation.state.members,
+                                    currentWeekStartEpochMillis = WeeklyResetCalculator
+                                        .currentWeekStartEpochMillis(System.currentTimeMillis())
+                                )
                             )
                         }
                         is CommunityObservation.SoloMode -> _uiState.update {
@@ -104,7 +115,8 @@ class CommunityDashboardViewModel @Inject constructor(
                                 hasActiveCommunity = true,
                                 isSolo = true,
                                 inviteCode = observation.inviteCode,
-                                members = emptyList()
+                                members = emptyList(),
+                                communitySatisfaction = null
                             )
                         }
                     }

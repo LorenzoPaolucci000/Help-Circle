@@ -1,6 +1,7 @@
 package com.project.helpcircle.presentation.community
 
 import com.project.helpcircle.domain.engine.ForegroundAppTracker
+import com.project.helpcircle.domain.engine.WeeklyResetCalculator
 import com.project.helpcircle.domain.model.ChargeWallet
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityState
@@ -91,8 +92,17 @@ private class DashboardFakeNudgeRepository : NudgeRepository {
     }
 }
 
-private fun member(id: String, status: MemberStatus = MemberStatus.OK, score: Int = 50) =
-    CommunityMember(id, "nick-$id", status, score)
+private fun member(
+    id: String,
+    status: MemberStatus = MemberStatus.OK,
+    score: Int = 50,
+    satisfaction: WeeklySatisfaction? = null,
+    satisfactionWeekStart: Long? = null
+) = CommunityMember(id, "nick-$id", status, score, satisfaction, satisfactionWeekStart)
+
+/** The week a rating must be stamped with to count right now — the same value the ViewModel derives internally. */
+private fun currentWeekStart(): Long =
+    WeeklyResetCalculator.currentWeekStartEpochMillis(System.currentTimeMillis())
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommunityDashboardViewModelTest {
@@ -182,6 +192,59 @@ class CommunityDashboardViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(68, state.latestWeeklyCollectiveIndex)
         assertEquals(55, state.previousWeeklyCollectiveIndex)
+    }
+
+    @Test
+    fun `the circle's current-week ratings are aggregated into the ui state`() {
+        val week = currentWeekStart()
+        val members = listOf(
+            member("self", satisfaction = WeeklySatisfaction.HAPPY, satisfactionWeekStart = week),
+            member("peer", satisfaction = WeeklySatisfaction.NEUTRAL, satisfactionWeekStart = week)
+        )
+        val stateFlow = MutableStateFlow(CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, members = members))
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1", stateFlow))
+
+        val satisfaction = viewModel.uiState.value.communitySatisfaction
+        assertEquals(2, satisfaction?.ratedMemberCount)
+        assertEquals(2, satisfaction?.memberCount)
+        assertEquals(75, satisfaction?.averageScore)
+    }
+
+    @Test
+    fun `a circle where nobody has rated this week reports no ratings but still counts its members`() {
+        val members = listOf(member("self"), member("peer"))
+        val stateFlow = MutableStateFlow(CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, members = members))
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1", stateFlow))
+
+        val satisfaction = viewModel.uiState.value.communitySatisfaction
+        assertEquals(false, satisfaction?.hasRatings)
+        assertEquals(2, satisfaction?.memberCount)
+    }
+
+    @Test
+    fun `ratings left over from a previous week are not counted toward this week`() {
+        val staleWeek = currentWeekStart() - WeeklyResetCalculator.WEEK_DURATION_MILLIS
+        val members = listOf(
+            member("self", satisfaction = WeeklySatisfaction.HAPPY, satisfactionWeekStart = staleWeek),
+            member("peer", satisfaction = WeeklySatisfaction.BAD, satisfactionWeekStart = currentWeekStart())
+        )
+        val stateFlow = MutableStateFlow(CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, members = members))
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1", stateFlow))
+
+        val satisfaction = viewModel.uiState.value.communitySatisfaction
+        assertEquals(1, satisfaction?.ratedMemberCount)
+        assertEquals(0, satisfaction?.averageScore)
+    }
+
+    @Test
+    fun `solo mode reports no community satisfaction at all`() {
+        val stateFlow = MutableStateFlow(
+            CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, inviteCode = "AB12CD")
+        )
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1", stateFlow))
+
+        assertTrue(viewModel.uiState.value.isSolo)
+        assertNull(viewModel.uiState.value.communitySatisfaction)
     }
 
     @Test

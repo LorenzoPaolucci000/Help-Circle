@@ -118,6 +118,37 @@ class WeeklyResetCalculatorTest {
     }
 
     @Test
+    fun `the current week starts at the most recent boundary, a week after the last closed one`() {
+        val midweek = SUNDAY_NIGHT_MILLIS + 3 * 24 * 60 * 60 * 1000L
+
+        val currentWeekStart = WeeklyResetCalculator.currentWeekStartEpochMillis(midweek, ZONE)
+
+        assertEquals(SUNDAY_NIGHT_MILLIS, currentWeekStart)
+        assertEquals(
+            WeeklyResetCalculator.mostRecentWeekStartEpochMillis(midweek, ZONE) +
+                WeeklyResetCalculator.WEEK_DURATION_MILLIS,
+            currentWeekStart
+        )
+    }
+
+    @Test
+    fun `the current week start is stable across the whole week and moves once the boundary passes`() {
+        val mondayAfter = SUNDAY_NIGHT_MILLIS + 24 * 60 * 60 * 1000L
+        val saturdayAfter = SUNDAY_NIGHT_MILLIS + 6 * 24 * 60 * 60 * 1000L
+        val nextSundayNight = SUNDAY_NIGHT_MILLIS + WeeklyResetCalculator.WEEK_DURATION_MILLIS
+
+        assertEquals(
+            WeeklyResetCalculator.currentWeekStartEpochMillis(mondayAfter, ZONE),
+            WeeklyResetCalculator.currentWeekStartEpochMillis(saturdayAfter, ZONE)
+        )
+        // Once the next boundary is reached, a rating stamped with the old week is no longer current.
+        assertEquals(
+            nextSundayNight,
+            WeeklyResetCalculator.currentWeekStartEpochMillis(nextSundayNight, ZONE)
+        )
+    }
+
+    @Test
     fun `a new snapshot should be recorded when none has ever been recorded`() {
         val shouldRecord = WeeklyResetCalculator.shouldRecordNewWeeklySnapshot(
             latestRecordedWeekStartEpochMillis = null,
