@@ -13,10 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,12 +23,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.model.WeeklySummary
+import com.project.helpcircle.presentation.common.EmptyState
+import com.project.helpcircle.presentation.common.IndexRing
+import com.project.helpcircle.presentation.common.MetaChip
+import com.project.helpcircle.presentation.common.ScreenColumn
+import com.project.helpcircle.presentation.common.ScreenHeader
+import com.project.helpcircle.presentation.common.SectionCard
+import com.project.helpcircle.presentation.common.StatMiniCard
+import com.project.helpcircle.ui.theme.Shapes
+import com.project.helpcircle.ui.theme.Spacing
+import com.project.helpcircle.ui.theme.trendColor
 import kotlin.math.abs
 
 /** Entry point: hoists [HomeViewModel] state and hands it to the stateless content below. */
@@ -55,90 +60,119 @@ private fun HomeContent(
     onSatisfactionSelected: (WeeklySatisfaction) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        if (uiState.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            return@Box
+    if (uiState.isLoading) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+        return
+    }
+    ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
+        ScreenHeader(
+            overline = "Just for you",
+            title = "Your agency",
+            // Literally true of everything on this screen: IA_ind and the weekly history are
+            // computed and stored on the device and never published to the circle.
+            trailing = { MetaChip(text = "Private · not shared") }
+        )
+
+        PersonalIndexCard(
+            currentAgencyIndex = uiState.currentAgencyIndex,
+            weeklyDelta = uiState.latestWeeklySummary?.agencyIndexDelta
+        )
+
+        WeeklyTrendCard(weeklyDeltasOldestFirst = uiState.weeklyDeltasOldestFirst)
+
+        // Placed before the retrospective card deliberately: this asks about the week in progress,
+        // whereas "Last week" recaps a finished one.
+        WeeklySatisfactionCard(
+            selected = uiState.currentWeekSatisfaction,
+            isSubmitting = uiState.isSubmittingSatisfaction,
+            error = uiState.satisfactionError,
+            onSelect = onSatisfactionSelected
+        )
+
+        LatestWeeklySummaryCard(
+            summary = uiState.latestWeeklySummary,
+            previousSummary = uiState.previousWeeklySummary
+        )
+    }
+}
+
+/** This device's own IA_ind — never a peer's — with a plain-language note on what it measures. */
+@Composable
+private fun PersonalIndexCard(
+    currentAgencyIndex: Int,
+    weeklyDelta: Int?,
+    modifier: Modifier = Modifier
+) {
+    SectionCard(
+        modifier = modifier,
+        title = "Agency index",
+        subtitle = "Your digital autonomy · IA_ind",
+        trailing = weeklyDelta?.let { delta ->
+            {
+                MetaChip(
+                    text = if (delta >= 0) "+$delta pts" else "$delta pts",
+                    containerColor = trendColor(delta).copy(alpha = 0.18f),
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            PersonalIndexDisplay(currentAgencyIndex = uiState.currentAgencyIndex)
-            Spacer(modifier = Modifier.height(40.dp))
-            WeeklyTrendChart(weeklyDeltasOldestFirst = uiState.weeklyDeltasOldestFirst)
-            Spacer(modifier = Modifier.height(32.dp))
-            // Placed before the retrospective card deliberately: this asks about the week in
-            // progress, whereas "Last week" recaps a finished one.
-            WeeklySatisfactionCard(
-                selected = uiState.currentWeekSatisfaction,
-                isSubmitting = uiState.isSubmittingSatisfaction,
-                error = uiState.satisfactionError,
-                onSelect = onSatisfactionSelected
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            LatestWeeklySummaryCard(
-                summary = uiState.latestWeeklySummary,
-                previousSummary = uiState.previousWeeklySummary
-            )
-        }
-    }
-}
-
-/** Large, central IA_ind score — this device's own, never a peer's. */
-@Composable
-private fun PersonalIndexDisplay(currentAgencyIndex: Int, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = currentAgencyIndex.toString(),
-            fontSize = 96.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Your Agency Index",
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/** A simple bar-per-week trend: bar height reflects that week's IA_ind delta magnitude, color reflects its sign. */
-@Composable
-private fun WeeklyTrendChart(weeklyDeltasOldestFirst: List<Int>, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = "Weekly trend", style = MaterialTheme.typography.titleSmall)
-        Spacer(modifier = Modifier.height(12.dp))
-        if (weeklyDeltasOldestFirst.isEmpty()) {
+            IndexRing(value = currentAgencyIndex)
             Text(
-                text = "No weekly history yet — check back after your first weekly reset.",
+                text = "IA_ind measures how intentionally you use your phone — your choices, not " +
+                    "just your habits. It starts at 50 and resets every week.",
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                val maxMagnitude = weeklyDeltasOldestFirst.maxOf { abs(it) }.coerceAtLeast(1)
-                weeklyDeltasOldestFirst.forEach { delta ->
-                    val barHeight = (abs(delta).toFloat() / maxMagnitude * 52).coerceAtLeast(4f)
-                    Box(
-                        modifier = Modifier
-                            .width(16.dp)
-                            .height(barHeight.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(if (delta >= 0) Color(0xFF66BB6A) else Color(0xFFE57373))
-                    )
-                }
+        }
+    }
+}
+
+/**
+ * A bar-per-week trend: bar height reflects that week's IA_ind delta magnitude, color its sign.
+ *
+ * Deliberately per-week rather than per-day — the underlying history is one summary per completed
+ * week, so a daily chart would have nothing real to plot.
+ */
+@Composable
+private fun WeeklyTrendCard(weeklyDeltasOldestFirst: List<Int>, modifier: Modifier = Modifier) {
+    SectionCard(
+        modifier = modifier,
+        title = "Weekly trend",
+        subtitle = "How each finished week moved your index"
+    ) {
+        if (weeklyDeltasOldestFirst.isEmpty()) {
+            EmptyState(
+                title = "No weekly history yet",
+                detail = "Your first bar appears after the weekly reset on Sunday night."
+            )
+            return@SectionCard
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            val maxMagnitude = weeklyDeltasOldestFirst.maxOf { abs(it) }.coerceAtLeast(1)
+            weeklyDeltasOldestFirst.forEach { delta ->
+                val barHeight = (abs(delta).toFloat() / maxMagnitude * 64).coerceAtLeast(6f)
+                Box(
+                    modifier = Modifier
+                        .width(20.dp)
+                        .height(barHeight.dp)
+                        .clip(Shapes.field)
+                        .background(trendColor(delta))
+                )
             }
         }
     }
@@ -157,42 +191,36 @@ private fun WeeklySatisfactionCard(
     onSelect: (WeeklySatisfaction) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "How is this week going?", style = MaterialTheme.typography.titleSmall)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (selected == null) {
-                    "Your circle sees the shared mood — never what caused it."
-                } else {
-                    "Shared with your circle. Tap another face to change it."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                WeeklySatisfaction.entries.forEach { option ->
-                    SatisfactionOption(
-                        option = option,
-                        isSelected = option == selected,
-                        enabled = !isSubmitting,
-                        onClick = { onSelect(option) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            if (error != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+    SectionCard(
+        modifier = modifier,
+        title = "How is this week going?",
+        subtitle = if (selected == null) {
+            "Your circle sees the shared mood — never what caused it."
+        } else {
+            "Shared with your circle. Tap another face to change it."
+        }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            WeeklySatisfaction.entries.forEach { option ->
+                SatisfactionOption(
+                    option = option,
+                    isSelected = option == selected,
+                    enabled = !isSubmitting,
+                    onClick = { onSelect(option) },
+                    modifier = Modifier.weight(1f)
                 )
             }
+        }
+        if (error != null) {
+            Spacer(modifier = Modifier.height(Spacing.md))
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }
@@ -206,10 +234,9 @@ private fun SatisfactionOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(12.dp)
     Column(
         modifier = modifier
-            .clip(shape)
+            .clip(Shapes.card)
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
             )
@@ -220,14 +247,14 @@ private fun SatisfactionOption(
                 } else {
                     MaterialTheme.colorScheme.outlineVariant
                 },
-                shape = shape
+                shape = Shapes.card
             )
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(text = option.emoji, fontSize = 32.sp)
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Spacing.xs))
         Text(
             text = option.label,
             style = MaterialTheme.typography.labelMedium,
@@ -254,59 +281,70 @@ private val WeeklySatisfaction.label: String
         WeeklySatisfaction.HAPPY -> "Good"
     }
 
-/** Recap of the most recently completed week: when crises peaked and which intervention helped most, each set against the week before it. */
+/**
+ * Recap of the most recently completed week: when crises peaked and which intervention helped most,
+ * each set against the week before it.
+ */
 @Composable
 private fun LatestWeeklySummaryCard(
     summary: WeeklySummary?,
     previousSummary: WeeklySummary?,
     modifier: Modifier = Modifier
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "Last week", style = MaterialTheme.typography.titleSmall)
-            Spacer(modifier = Modifier.height(8.dp))
-            if (summary == null) {
-                Text(
-                    text = "No weekly summary yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                WeeklyStatRow(
-                    label = "Peak crisis hour",
-                    value = summary.peakCrisisHour?.let { "$it:00" } ?: "No crises",
-                    previousValue = previousSummary?.let { it.peakCrisisHour?.let { hour -> "$hour:00" } ?: "No crises" }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                WeeklyStatRow(
-                    label = "Most effective intervention",
-                    value = summary.mostEffectiveInterventionCategory ?: "None",
-                    previousValue = previousSummary?.let { it.mostEffectiveInterventionCategory ?: "None" }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                WeeklyStatRow(
-                    label = "Agency trend",
-                    value = summary.agencyIndexDelta.toSignedString(),
-                    previousValue = previousSummary?.agencyIndexDelta?.toSignedString()
-                )
-            }
+    SectionCard(
+        modifier = modifier,
+        title = "Last week",
+        subtitle = "The most recent week to have finished"
+    ) {
+        if (summary == null) {
+            EmptyState(
+                title = "No weekly summary yet",
+                detail = "One is written for you after each weekly reset."
+            )
+            return@SectionCard
         }
-    }
-}
-
-/** One "Last week" stat, with an optional caption comparing it to the week before that. */
-@Composable
-private fun WeeklyStatRow(label: String, value: String, previousValue: String?, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Text(text = "$label: $value")
-        if (previousValue != null) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            // Labels are kept to two short words: a third of a phone's width breaks anything
+            // longer mid-word, which is how "Best intervention" first rendered as "interventi/on".
+            StatMiniCard(
+                value = summary.peakCrisisHourLabel(),
+                label = "Peak hour",
+                modifier = Modifier.weight(1f)
+            )
+            StatMiniCard(
+                value = summary.interventionLabel(),
+                label = "Best nudge",
+                modifier = Modifier.weight(1f)
+            )
+            StatMiniCard(
+                value = summary.agencyIndexDelta.toSignedString(),
+                label = "Agency trend",
+                valueColor = trendColor(summary.agencyIndexDelta),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (previousSummary != null) {
+            Spacer(modifier = Modifier.height(Spacing.md))
             Text(
-                text = "The week before: $previousValue",
+                // One line in the same order as the three cards above, rather than a caption under
+                // each, so the comparison doesn't double the height of the card.
+                text = "The week before: ${previousSummary.peakCrisisHourLabel()} · " +
+                    "${previousSummary.interventionLabel()} · " +
+                    previousSummary.agencyIndexDelta.toSignedString(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
+
+private fun WeeklySummary.peakCrisisHourLabel(): String =
+    peakCrisisHour?.let { "$it:00" } ?: "None"
+
+private fun WeeklySummary.interventionLabel(): String =
+    mostEffectiveInterventionCategory ?: "None"
 
 private fun Int.toSignedString(): String = if (this >= 0) "+$this" else toString()

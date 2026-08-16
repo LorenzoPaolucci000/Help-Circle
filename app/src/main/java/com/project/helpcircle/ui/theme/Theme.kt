@@ -257,8 +257,11 @@ val unspecified_scheme = ColorFamily(
 @Composable
 fun HelpCircleTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Off by default: the app's palette is a fixed identity, not something derived from whatever
+    // wallpaper the user happens to have. With dynamic color enabled (the Compose default) every
+    // scheme defined in Color.kt is discarded on Android 12+, so the same screen renders differently
+    // from device to device. The parameter is kept so a caller can still opt in deliberately.
+    dynamicColor: Boolean = false,
     content: @Composable() () -> Unit
 ) {
   val colorScheme = when {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Dark counterparts of the window themes in values/themes.xml. Without these the window
+         behind Compose stayed light in dark mode, so the app showed a white frame around a dark
+         surface and flashed white on launch. -->
+
+    <style name="Theme.HelpCircle" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+
+    <style name="Theme.HelpCircle.Fallback" parent="android:Theme.Material.Dialog" />
+</resources>

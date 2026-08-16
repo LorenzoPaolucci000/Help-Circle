@@ -1,15 +1,9 @@
 package com.project.helpcircle.presentation.onboarding
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -21,9 +15,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.project.helpcircle.domain.usecase.NicknameValidationResult
+import com.project.helpcircle.presentation.common.MetaChip
+import com.project.helpcircle.presentation.common.PrimaryButton
+import com.project.helpcircle.presentation.common.ScreenColumn
+import com.project.helpcircle.presentation.common.StepProgressHeader
+import com.project.helpcircle.ui.theme.Shapes
+import com.project.helpcircle.ui.theme.Spacing
 
 /** Entry point: hoists [NicknameSetupViewModel] state and hands it to the stateless content below. */
 @Composable
@@ -55,43 +54,57 @@ private fun NicknameSetupContent(
     onContinueClicked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(text = "Choose your circle name", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Your name is only visible to your circle members — never to us",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(24.dp))
+    ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
+        StepProgressHeader(step = 2, totalSteps = ONBOARDING_STEP_COUNT)
+
+        Spacer(modifier = Modifier.height(Spacing.xxl))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Choose a nickname",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Text(
+                text = "This is the only thing your circle ever sees about you.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+
         OutlinedTextField(
             value = uiState.nickname,
             onValueChange = onNicknameChanged,
             singleLine = true,
+            shape = Shapes.field,
+            label = { Text("Nickname") },
+            placeholder = { Text("e.g. quiet-otter") },
             isError = uiState.validationResult != null && uiState.validationResult != NicknameValidationResult.Valid,
             supportingText = { validationMessage(uiState.validationResult)?.let { Text(it) } },
             modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        TextButton(onClick = onGenerateClicked) {
-            Text("Generate one for me")
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = onContinueClicked,
-            enabled = uiState.validationResult == NicknameValidationResult.Valid && !uiState.isSaving,
-            modifier = Modifier.fillMaxWidth()
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Continue")
+            MetaChip(text = "Not linked to your real name")
+            TextButton(onClick = onGenerateClicked) {
+                Text("Generate one for me")
+            }
         }
+
+        PrimaryButton(
+            text = "Continue",
+            onClick = onContinueClicked,
+            enabled = uiState.validationResult == NicknameValidationResult.Valid && !uiState.isSaving
+        )
     }
 }
 

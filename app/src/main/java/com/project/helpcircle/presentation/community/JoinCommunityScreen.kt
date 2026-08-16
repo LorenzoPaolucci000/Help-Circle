@@ -1,22 +1,22 @@
 package com.project.helpcircle.presentation.community
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.Tab
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,13 +24,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.project.helpcircle.presentation.common.MonitoredAppsRequiredBanner
+import com.project.helpcircle.presentation.common.PrimaryButton
+import com.project.helpcircle.presentation.common.ScreenColumn
+import com.project.helpcircle.presentation.common.SecondaryButton
+import com.project.helpcircle.presentation.common.SectionCard
+import com.project.helpcircle.presentation.common.StepProgressHeader
+import com.project.helpcircle.presentation.onboarding.ONBOARDING_STEP_COUNT
+import com.project.helpcircle.ui.theme.Shapes
+import com.project.helpcircle.ui.theme.Spacing
 
 /** Entry point: hoists [JoinCommunityViewModel] state and hands it to the stateless content below. */
 @Composable
@@ -58,6 +66,11 @@ fun JoinCommunityScreen(
     )
 }
 
+/**
+ * The last onboarding step. The two ways in are radio cards rather than a tab row: a tab row reads
+ * as "two views of the same thing", whereas joining an existing circle and starting a new one are
+ * genuinely different choices, only one of which the user will make.
+ */
 @Composable
 private fun JoinCommunityContent(
     uiState: JoinCommunityUiState,
@@ -70,151 +83,219 @@ private fun JoinCommunityContent(
     modifier: Modifier = Modifier
 ) {
     if (!uiState.hasMonitoredApps) {
-        Box(modifier = modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(Spacing.xxl),
+            contentAlignment = Alignment.Center
+        ) {
             MonitoredAppsRequiredBanner(
-                actionLabel = "Go to Settings",
+                actionLabel = "Choose apps to monitor",
                 onActionClicked = onGoToMonitoredApps
             )
         }
         return
     }
-    Column(modifier = modifier.fillMaxSize()) {
-        SecondaryTabRow(selectedTabIndex = uiState.selectedTab.ordinal) {
-            Tab(
-                selected = uiState.selectedTab == JoinCommunityTab.JOIN,
-                onClick = { onTabSelected(JoinCommunityTab.JOIN) },
-                text = { Text("Join") }
+
+    // Once a circle exists there is nothing left to choose, so the options give way to the code.
+    val createdInviteCode = uiState.createdInviteCode
+    if (createdInviteCode != null) {
+        CreatedCircleContent(
+            inviteCode = createdInviteCode,
+            onContinue = onContinueAfterCreateClicked,
+            modifier = modifier
+        )
+        return
+    }
+
+    ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
+        StepProgressHeader(step = 5, totalSteps = ONBOARDING_STEP_COUNT)
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Your circle",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground
             )
-            Tab(
-                selected = uiState.selectedTab == JoinCommunityTab.CREATE,
-                onClick = { onTabSelected(JoinCommunityTab.CREATE) },
-                text = { Text("Create") }
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = "Join a circle you were invited to, or start your own.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(48.dp))
-            when (uiState.selectedTab) {
-                JoinCommunityTab.JOIN -> JoinTabContent(uiState, onInviteCodeInputChanged, onJoinClicked)
-                JoinCommunityTab.CREATE -> CreateTabContent(uiState, onCreateClicked, onContinueAfterCreateClicked)
+
+        CircleOptionCard(
+            title = "Join with a code",
+            detail = "Enter the 6-character code a member shared with you.",
+            selected = uiState.selectedTab == JoinCommunityTab.JOIN,
+            onClick = { onTabSelected(JoinCommunityTab.JOIN) }
+        )
+        CircleOptionCard(
+            title = "Create a circle",
+            detail = "Start a new one and invite people yourself.",
+            selected = uiState.selectedTab == JoinCommunityTab.CREATE,
+            onClick = { onTabSelected(JoinCommunityTab.CREATE) }
+        )
+
+        when (uiState.selectedTab) {
+            JoinCommunityTab.JOIN -> {
+                OutlinedTextField(
+                    value = uiState.inviteCodeInput,
+                    onValueChange = onInviteCodeInputChanged,
+                    singleLine = true,
+                    shape = Shapes.field,
+                    enabled = !uiState.isJoining,
+                    label = { Text("Invite code") },
+                    isError = uiState.joinError != null,
+                    supportingText = { uiState.joinError?.let { Text(it) } },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (uiState.isJoining) {
+                    LoadingRow()
+                } else {
+                    PrimaryButton(
+                        text = if (uiState.joinTimedOut) "Retry" else "Join",
+                        onClick = onJoinClicked,
+                        enabled = uiState.inviteCodeInput.isNotBlank()
+                    )
+                }
+            }
+
+            JoinCommunityTab.CREATE -> {
+                uiState.createError?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                if (uiState.isCreating) {
+                    LoadingRow()
+                } else {
+                    PrimaryButton(
+                        text = if (uiState.createTimedOut) "Retry" else "Create a circle",
+                        onClick = onCreateClicked
+                    )
+                }
             }
         }
     }
 }
 
+/** One of the two ways into a circle, selectable as a whole card rather than by a small radio dot. */
 @Composable
-private fun JoinTabContent(
-    uiState: JoinCommunityUiState,
-    onInviteCodeInputChanged: (String) -> Unit,
-    onJoinClicked: () -> Unit
+private fun CircleOptionCard(
+    title: String,
+    detail: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Text(text = "Join your circle", style = MaterialTheme.typography.headlineSmall)
-    Spacer(modifier = Modifier.height(8.dp))
-    Text(
-        text = "Enter the circle code a member shared with you",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center
-    )
-    Spacer(modifier = Modifier.height(24.dp))
-    OutlinedTextField(
-        value = uiState.inviteCodeInput,
-        onValueChange = onInviteCodeInputChanged,
-        singleLine = true,
-        enabled = !uiState.isJoining,
-        isError = uiState.joinError != null,
-        supportingText = { uiState.joinError?.let { Text(it) } },
-        modifier = Modifier.fillMaxWidth()
-    )
-    Spacer(modifier = Modifier.height(24.dp))
-    Button(
-        onClick = onJoinClicked,
-        enabled = uiState.inviteCodeInput.isNotBlank() && !uiState.isJoining,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        if (uiState.isJoining) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onPrimary
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(Shapes.card)
+            .background(
+                if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                }
             )
-        } else {
-            Text(if (uiState.joinTimedOut) "Retry" else "Join")
+            .then(
+                if (selected) {
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, Shapes.card)
+                } else {
+                    Modifier
+                }
+            )
+            .selectable(selected = selected, onClick = onClick)
+            .padding(Spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
+            )
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
+        RadioButton(selected = selected, onClick = onClick)
     }
 }
 
+/** Shown after a circle is created: the invite code is the only thing that matters here. */
 @Composable
-private fun CreateTabContent(
-    uiState: JoinCommunityUiState,
-    onCreateClicked: () -> Unit,
-    onContinueAfterCreateClicked: () -> Unit
+private fun CreatedCircleContent(
+    inviteCode: String,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
-    val inviteCode = uiState.createdInviteCode
+    ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
+        StepProgressHeader(step = ONBOARDING_STEP_COUNT, totalSteps = ONBOARDING_STEP_COUNT)
 
-    if (inviteCode == null) {
-        Text(text = "Create a circle", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Start a new circle and invite friends to join",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        uiState.createError?.let {
-            Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-        Button(
-            onClick = onCreateClicked,
-            enabled = !uiState.isCreating,
-            modifier = Modifier.fillMaxWidth()
+        Spacer(modifier = Modifier.height(Spacing.xxl))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (uiState.isCreating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text(if (uiState.createTimedOut) "Retry" else "Create a circle")
-            }
+            Text(
+                text = "Your circle is ready",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Text(
+                text = "Share this code with people you trust.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
-    } else {
-        Text(text = "Your circle is ready", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Share this code with peers you trust",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = inviteCode,
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = { clipboardManager.setText(AnnotatedString(inviteCode)) },
-            modifier = Modifier.fillMaxWidth()
+
+        SectionCard(
+            title = "Your invite code",
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         ) {
-            Text("Copy code")
+            Text(
+                text = inviteCode,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.displaySmall,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(Spacing.lg))
+            SecondaryButton(
+                text = "Copy code",
+                onClick = { clipboardManager.setText(AnnotatedString(inviteCode)) }
+            )
         }
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = onContinueAfterCreateClicked,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Continue")
-        }
+
+        PrimaryButton(text = "Continue", onClick = onContinue)
+    }
+}
+
+@Composable
+private fun LoadingRow(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(modifier = Modifier.size(Spacing.xxl), strokeWidth = 2.dp)
     }
 }

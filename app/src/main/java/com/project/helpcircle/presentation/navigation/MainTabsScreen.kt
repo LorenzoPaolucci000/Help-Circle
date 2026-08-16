@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,7 +17,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -28,6 +29,7 @@ import com.project.helpcircle.presentation.community.CommunityDashboardScreen
 import com.project.helpcircle.presentation.help.HelpScreen
 import com.project.helpcircle.presentation.home.HomeScreen
 import com.project.helpcircle.presentation.settings.SettingsScreen
+import com.project.helpcircle.ui.theme.Spacing
 
 /**
  * Hosts the four peer top-level screens (Me/Community/Help/Settings) behind a Material3
@@ -52,7 +54,7 @@ fun MainTabsScreen(
         bottomBar = {
             val currentBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = currentBackStackEntry?.destination?.route
-            NavigationBar {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 TabDestination.entries.forEach { tab ->
                     NavigationBarItem(
                         selected = currentRoute == tab.route,
@@ -64,7 +66,14 @@ fun MainTabsScreen(
                             }
                         },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) }
+                        label = { Text(tab.label, style = MaterialTheme.typography.labelMedium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                            selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
@@ -81,7 +90,7 @@ fun MainTabsScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = Spacing.screenHorizontal, vertical = Spacing.sm)
                 )
             }
             NavHost(

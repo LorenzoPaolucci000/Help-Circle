@@ -37,10 +37,30 @@ data class HelpUiState(
     val totalPeerCount: Int = 0,
     val availableCharges: Int = ChargeWallet.MAX_CHARGES,
     val maxCharges: Int = ChargeWallet.MAX_CHARGES,
-    val nudgeTarget: CommunityMember? = null,
+    /**
+     * Who the next intervention would go to. Nothing can be sent until this is set, which is what
+     * the screen renders the intervention buttons as unavailable to convey.
+     */
+    val selectedPeer: CommunityMember? = null,
+    /** The multi-option intervention whose follow-up dialog is open, if any. */
+    val optionPickerFor: InterventionType? = null,
+    /**
+     * How far each progressive intervention has been escalated for [selectedPeer]. Reset whenever
+     * the selection changes, so escalation is always per-peer rather than a running global tally.
+     */
+    val sentLevels: Map<InterventionType, Int> = emptyMap(),
     val isSendingNudge: Boolean = false,
     val nudgeFeedback: String? = null
-)
+) {
+    /** True once a peer is chosen, i.e. once the intervention buttons become usable. */
+    val canIntervene: Boolean get() = selectedPeer != null
+
+    /** How many presses of [type] have already landed for the selected peer. */
+    fun sentLevelOf(type: InterventionType): Int = sentLevels[type] ?: 0
+
+    /** False once a type has been pressed as many times as it can be for this peer. */
+    fun hasRemaining(type: InterventionType): Boolean = sentLevelOf(type) < type.maxLevel
+}
 
 @HiltViewModel
 class HelpViewModel @Inject constructor(
@@ -78,16 +98,20 @@ class HelpViewModel @Inject constructor(
                 .catch { _uiState.update { state -> state.copy(isLoading = false) } }
                 .onEach { helpable ->
                     _uiState.update {
+                        val stillSelectable = it.selectedPeer?.takeIf { target ->
+                            helpable.peers.any { peer -> peer.anonymousId == target.anonymousId }
+                        }
                         it.copy(
                             isLoading = false,
                             hasActiveCommunity = true,
                             peersNeedingHelp = helpable.peers,
                             totalPeerCount = helpable.totalPeerCount,
-                            // A peer who recovers while their picker is open is no longer a valid
-                            // target, so the dialog closes rather than sending into a stale state.
-                            nudgeTarget = it.nudgeTarget?.takeIf { target ->
-                                helpable.peers.any { peer -> peer.anonymousId == target.anonymousId }
-                            }
+                            // A peer who recovers while they're selected is no longer a valid
+                            // target, so the selection (and any open option dialog) is dropped
+                            // rather than left pointing at a state the screen has just decided is
+                            // no longer helpable.
+                            selectedPeer = stillSelectable,
+                            optionPickerFor = it.optionPickerFor.takeIf { _ -> stillSelectable != null }
                         )
                     }
                 }
@@ -99,33 +123,86 @@ class HelpViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    /** Opens the nudge-type picker for the tapped peer. */
+    /**
+     * Chooses who an intervention would go to, which is what unlocks the intervention buttons.
+     * Tapping the already-selected peer clears the selection, so a mis-tap is undoable without
+     * having to send something.
+     */
     fun onMemberClicked(member: CommunityMember) {
-        _uiState.update { it.copy(nudgeTarget = member) }
+        _uiState.update {
+            val alreadySelected = it.selectedPeer?.anonymousId == member.anonymousId
+            it.copy(
+                selectedPeer = if (alreadySelected) null else member,
+                // Deselecting must not leave a dialog open over a peer who is no longer chosen.
+                optionPickerFor = null,
+                // Escalation is per-peer: switching target starts the grey-scale ramp over rather
+                // than carrying the previous peer's intensity across to someone else.
+                sentLevels = emptyMap()
+            )
+        }
     }
 
-    fun onNudgePickerDismissed() {
-        _uiState.update { it.copy(nudgeTarget = null) }
+    /**
+     * Handles a tap on one of the four intervention buttons. [InterventionType.TEXT] asks which
+     * variant first; the rest send immediately, with progressive types sending the next level up
+     * each time and charging again for it.
+     */
+    fun onInterventionClicked(type: InterventionType) {
+        val state = _uiState.value
+        if (state.selectedPeer == null || state.isSendingNudge) return
+        val nudge = type.nudgeAfter(state.sentLevelOf(type))
+        if (nudge == null) {
+            // Either a type that asks instead of sending, or one already at full intensity. The
+            // button is disabled in the exhausted case, so in practice this opens the dialog.
+            if (type.options.isNotEmpty()) {
+                _uiState.update { it.copy(optionPickerFor = type) }
+            }
+        } else {
+            sendNudgeTo(state.selectedPeer, nudge, escalating = type)
+        }
+    }
+
+    fun onOptionPickerDismissed() {
+        _uiState.update { it.copy(optionPickerFor = null) }
     }
 
     fun onNudgeFeedbackShown() {
         _uiState.update { it.copy(nudgeFeedback = null) }
     }
 
+    /** Sends the variant picked from a multi-option intervention's follow-up dialog. */
     fun onNudgeSelected(nudge: Nudge) {
-        val target = _uiState.value.nudgeTarget ?: return
+        val state = _uiState.value
+        val target = state.selectedPeer ?: return
+        sendNudgeTo(target, nudge, escalating = state.optionPickerFor)
+    }
+
+    /**
+     * @param escalating the button this came from, whose level counter advances only if the send
+     *   actually lands — a rejected or unaffordable attempt must not consume a step of the ramp.
+     */
+    private fun sendNudgeTo(target: CommunityMember, nudge: Nudge, escalating: InterventionType?) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSendingNudge = true) }
             val communityId = communityRepository.getActiveCommunityId()
             if (communityId == null) {
                 _uiState.update {
-                    it.copy(isSendingNudge = false, nudgeTarget = null, nudgeFeedback = "No active circle")
+                    it.copy(
+                        isSendingNudge = false,
+                        selectedPeer = null,
+                        optionPickerFor = null,
+                        nudgeFeedback = "No active circle"
+                    )
                 }
                 return@launch
             }
+            var landed = false
             val feedback = try {
                 when (val result = sendNudge(communityId, target.anonymousId, nudge)) {
-                    is NudgeResult.Sent -> "Nudge sent to ${target.nickname}"
+                    is NudgeResult.Sent -> {
+                        landed = true
+                        "Nudge sent to ${target.nickname}"
+                    }
                     is NudgeResult.Error -> result.message
                 }
             } catch (e: CancellationException) {
@@ -133,7 +210,20 @@ class HelpViewModel @Inject constructor(
             } catch (e: IllegalStateException) {
                 e.message ?: "Not enough charges"
             }
-            _uiState.update { it.copy(isSendingNudge = false, nudgeTarget = null, nudgeFeedback = feedback) }
+            // The peer stays selected: a progressive intervention is escalated by pressing the same
+            // button again, which would be impossible if sending cleared the target.
+            _uiState.update {
+                it.copy(
+                    isSendingNudge = false,
+                    optionPickerFor = null,
+                    sentLevels = if (landed && escalating != null) {
+                        it.sentLevels + (escalating to (it.sentLevelOf(escalating) + 1))
+                    } else {
+                        it.sentLevels
+                    },
+                    nudgeFeedback = feedback
+                )
+            }
         }
     }
 }

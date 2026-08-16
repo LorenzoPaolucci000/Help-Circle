@@ -41,6 +41,15 @@ data class SettingsUiState(
         get() = apps
             .filter { it.displayName.contains(searchQuery, ignoreCase = true) }
             .groupBy { it.category }
+
+    /**
+     * How many monitorable apps are currently switched on, and how many aren't.
+     *
+     * Counted over the whole of [apps] rather than the search-filtered view, so typing in the
+     * search box narrows the list without appearing to change what is being monitored.
+     */
+    val trackedCount: Int get() = apps.count { it.packageName in pendingMonitoredPackageNames }
+    val excludedCount: Int get() = apps.size - trackedCount
 }
 
 @HiltViewModel

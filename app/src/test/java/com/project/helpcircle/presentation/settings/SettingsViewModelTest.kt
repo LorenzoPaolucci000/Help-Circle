@@ -112,6 +112,27 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `the monitoring scope counts tracked and excluded apps`() {
+        val (viewModel, _) = viewModel(monitored = setOf("com.social"))
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.trackedCount)
+        assertEquals(1, state.excludedCount)
+    }
+
+    @Test
+    fun `searching narrows the list without changing the monitoring scope counts`() {
+        val (viewModel, _) = viewModel(monitored = setOf("com.social"))
+
+        viewModel.onSearchQueryChanged("video")
+
+        // The list is now one app, but the scope still describes the whole device.
+        assertEquals(1, viewModel.uiState.value.appsByCategory.values.sumOf { it.size })
+        assertEquals(1, viewModel.uiState.value.trackedCount)
+        assertEquals(1, viewModel.uiState.value.excludedCount)
+    }
+
+    @Test
     fun `toggling an app flips its pending blacklist membership without saving yet`() {
         val (viewModel, monitoredAppsRepository) = viewModel()
 

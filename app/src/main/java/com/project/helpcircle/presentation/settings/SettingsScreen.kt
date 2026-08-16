@@ -10,15 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +28,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.project.helpcircle.domain.model.AppCategory
 import com.project.helpcircle.domain.model.AppInfo
+import com.project.helpcircle.presentation.common.DestructiveButton
+import com.project.helpcircle.presentation.common.EmptyState
+import com.project.helpcircle.presentation.common.PrimaryButton
+import com.project.helpcircle.presentation.common.ScreenColumn
+import com.project.helpcircle.presentation.common.ScreenHeader
+import com.project.helpcircle.presentation.common.SectionCard
+import com.project.helpcircle.ui.theme.Shapes
+import com.project.helpcircle.ui.theme.Spacing
 
 /** Entry point: hoists [SettingsViewModel] state and hands it to the stateless content below. */
 @Composable
@@ -58,6 +63,16 @@ fun SettingsScreen(
     )
 }
 
+/**
+ * One scrolling column, like the other tabs, with the app list rendered as plain rows rather than a
+ * `LazyColumn`.
+ *
+ * An earlier version pinned the header and actions and let the list scroll in a weighted region
+ * between them. That collapsed on a real device: with the monitoring banner shown above the tab
+ * content there was almost no room left, so the list rendered a few pixels tall and the leave button
+ * was pushed off the bottom entirely. Since only social and video apps are monitorable at all, the
+ * list is short by design and doesn't need its own scroll region.
+ */
 @Composable
 private fun SettingsContent(
     uiState: SettingsUiState,
@@ -70,108 +85,123 @@ private fun SettingsContent(
     modifier: Modifier = Modifier
 ) {
     if (uiState.showLeaveConfirmation) {
-        AlertDialog(
-            onDismissRequest = onLeaveCommunityDismissed,
-            title = { Text("Leave this circle?") },
-            text = {
-                Column {
-                    Text("You'll stop seeing this circle's members and it'll stop seeing you. This can't be undone.")
-                    uiState.leaveError?.let {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = onLeaveCommunityConfirmed,
-                    enabled = !uiState.isLeavingCommunity,
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text(if (uiState.leaveTimedOut) "Retry" else "Leave")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onLeaveCommunityDismissed, enabled = !uiState.isLeavingCommunity) {
-                    Text("Cancel")
-                }
-            }
+        LeaveCommunityDialog(
+            uiState = uiState,
+            onDismiss = onLeaveCommunityDismissed,
+            onConfirm = onLeaveCommunityConfirmed
         )
     }
-    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
-        Text(text = "Monitored apps", style = MaterialTheme.typography.titleLarge)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Choose which apps count toward doomscroll detection and focus mode.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    if (uiState.isLoading) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
+        ScreenHeader(overline = "Your setup", title = "Monitored apps")
+
+        MonitoringScopeCard(
+            trackedCount = uiState.trackedCount,
+            excludedCount = uiState.excludedCount
         )
-        Spacer(modifier = Modifier.height(16.dp))
+
         OutlinedTextField(
             value = uiState.searchQuery,
             onValueChange = onSearchQueryChanged,
             singleLine = true,
+            shape = Shapes.field,
             label = { Text("Search apps") },
             modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(16.dp))
 
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        SectionCard(
+            title = "Apps",
+            subtitle = "Only social and video apps can be monitored, so this list is short by design."
+        ) {
+            if (uiState.appsByCategory.isEmpty()) {
+                EmptyState(
+                    title = "No apps match",
+                    detail = "Try a different search term."
+                )
+                return@SectionCard
             }
-        } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                AppCategory.entries.forEach { category ->
-                    val appsInCategory = uiState.appsByCategory[category].orEmpty()
-                    if (appsInCategory.isNotEmpty()) {
-                        item(key = "header_${category.name}") { CategoryHeader(category) }
-                        items(appsInCategory, key = { it.packageName }) { app ->
-                            AppRow(
-                                app = app,
-                                isMonitored = app.packageName in uiState.pendingMonitoredPackageNames,
-                                onToggled = { onAppToggled(app.packageName) }
-                            )
-                        }
-                    }
+            AppCategory.entries.forEach { category ->
+                val appsInCategory = uiState.appsByCategory[category].orEmpty()
+                if (appsInCategory.isEmpty()) return@forEach
+                CategoryHeader(
+                    category = category,
+                    trackedCount = appsInCategory.count { it.packageName in uiState.pendingMonitoredPackageNames },
+                    totalCount = appsInCategory.size
+                )
+                appsInCategory.forEach { app ->
+                    AppRow(
+                        app = app,
+                        isMonitored = app.packageName in uiState.pendingMonitoredPackageNames,
+                        onToggled = { onAppToggled(app.packageName) }
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
         uiState.saveMessage?.let {
-            Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
-        Button(
-            onClick = onSaveClicked,
-            enabled = !uiState.isSaving && !uiState.isLoading,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (uiState.isSaving) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Save configuration")
+        if (uiState.isSaving) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             }
+        } else {
+            PrimaryButton(text = "Save configuration", onClick = onSaveClicked)
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        TextButton(
-            onClick = onLeaveCommunityClicked,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Leave this circle", color = MaterialTheme.colorScheme.error)
-        }
+        DestructiveButton(text = "Leave this circle", onClick = onLeaveCommunityClicked)
+    }
+}
+
+/** How much of the phone this app is watching, which is the one number this screen really decides. */
+@Composable
+private fun MonitoringScopeCard(trackedCount: Int, excludedCount: Int, modifier: Modifier = Modifier) {
+    SectionCard(
+        modifier = modifier,
+        title = "Monitoring scope",
+        containerColor = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Text(
+            text = if (trackedCount == 1) "1 app" else "$trackedCount apps",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        Text(
+            text = "actively tracked · $excludedCount excluded",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+        )
     }
 }
 
 @Composable
-private fun CategoryHeader(category: AppCategory, modifier: Modifier = Modifier) {
-    Text(
-        text = category.displayName(),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(top = 12.dp, bottom = 4.dp)
-    )
+private fun CategoryHeader(
+    category: AppCategory,
+    trackedCount: Int,
+    totalCount: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.padding(top = Spacing.md, bottom = Spacing.sm)) {
+        Text(
+            text = category.displayName().uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = "$trackedCount of $totalCount tracked",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
@@ -179,13 +209,59 @@ private fun AppRow(app: AppInfo, isMonitored: Boolean, onToggled: () -> Unit, mo
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = app.displayName, style = MaterialTheme.typography.bodyMedium)
-        Checkbox(checked = isMonitored, onCheckedChange = { onToggled() })
+        Text(
+            text = app.displayName,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Switch(checked = isMonitored, onCheckedChange = { onToggled() })
     }
+}
+
+/** Confirmation for the one irreversible action in the app. */
+@Composable
+private fun LeaveCommunityDialog(
+    uiState: SettingsUiState,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = Shapes.card,
+        title = { Text("Leave this circle?") },
+        text = {
+            Column {
+                Text("You'll stop seeing this circle's members and it'll stop seeing you. This can't be undone.")
+                uiState.leaveError?.let {
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = !uiState.isLeavingCommunity,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text(if (uiState.leaveTimedOut) "Retry" else "Leave")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !uiState.isLeavingCommunity) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 private fun AppCategory.displayName(): String = when (this) {

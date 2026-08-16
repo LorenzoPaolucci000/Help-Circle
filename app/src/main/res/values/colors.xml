@@ -7,4 +7,8 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Mirrors backgroundLight in ui/theme/Color.kt. Kept in sync by hand: the window is painted
+         by the platform before Compose runs, so it can't read the Compose color scheme. -->
+    <color name="window_background">#FFF9F9FF</color>
 </resources>

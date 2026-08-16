@@ -172,30 +172,171 @@ class HelpViewModelTest {
     }
 
     @Test
-    fun `tapping a peer opens the nudge picker for them`() {
+    fun `tapping a peer selects them and unlocks the interventions`() {
         val viewModel = viewModel(HelpFakeCommunityRepository("comm-1"))
         val peer = member("peer", MemberStatus.CRISIS)
 
         viewModel.onMemberClicked(peer)
 
-        assertEquals(peer, viewModel.uiState.value.nudgeTarget)
+        assertEquals(peer, viewModel.uiState.value.selectedPeer)
+        assertTrue(viewModel.uiState.value.canIntervene)
     }
 
     @Test
-    fun `dismissing the nudge picker clears the target`() {
+    fun `nothing can be sent until a peer is selected`() {
         val viewModel = viewModel(HelpFakeCommunityRepository("comm-1"))
+
+        assertEquals(false, viewModel.uiState.value.canIntervene)
+    }
+
+    @Test
+    fun `tapping the already-selected peer deselects them`() {
+        val viewModel = viewModel(HelpFakeCommunityRepository("comm-1"))
+        val peer = member("peer", MemberStatus.CRISIS)
+        viewModel.onMemberClicked(peer)
+
+        viewModel.onMemberClicked(peer)
+
+        assertNull(viewModel.uiState.value.selectedPeer)
+        assertEquals(false, viewModel.uiState.value.canIntervene)
+    }
+
+    @Test
+    fun `grey-scale escalates one level per press and sends each level in turn`() {
+        val nudgeRepository = HelpFakeNudgeRepository()
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 2)
+        val viewModel = viewModel(communityRepository, nudgeRepository = nudgeRepository)
         viewModel.onMemberClicked(member("peer", MemberStatus.CRISIS))
 
-        viewModel.onNudgePickerDismissed()
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+        assertEquals(Nudge.GreyscaleLevel(level = 1), nudgeRepository.lastSentNudge)
+        assertEquals(1, viewModel.uiState.value.sentLevelOf(InterventionType.GREYSCALE))
 
-        assertNull(viewModel.uiState.value.nudgeTarget)
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+        assertEquals(Nudge.GreyscaleLevel(level = 2), nudgeRepository.lastSentNudge)
+
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+        assertEquals(Nudge.GreyscaleLevel(level = 3), nudgeRepository.lastSentNudge)
+        assertEquals(3, viewModel.uiState.value.sentLevelOf(InterventionType.GREYSCALE))
+        // Exhausted: the button is disabled from here, and nothing further can be sent.
+        assertEquals(false, viewModel.uiState.value.hasRemaining(InterventionType.GREYSCALE))
     }
 
     @Test
-    fun `a peer who recovers while their picker is open stops being a target`() {
+    fun `grey-scale never escalates past its maximum level`() {
+        val nudgeRepository = HelpFakeNudgeRepository()
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 2)
+        val viewModel = viewModel(communityRepository, nudgeRepository = nudgeRepository)
+        viewModel.onMemberClicked(member("peer", MemberStatus.CRISIS))
+        repeat(3) { viewModel.onInterventionClicked(InterventionType.GREYSCALE) }
+        nudgeRepository.lastSentNudge = null
+
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+
+        assertNull(nudgeRepository.lastSentNudge)
+        assertEquals(3, viewModel.uiState.value.sentLevelOf(InterventionType.GREYSCALE))
+    }
+
+    @Test
+    fun `a failed send does not consume a step of the escalation`() {
+        val nudgeRepository = HelpFakeNudgeRepository()
+        // A one-member circle makes every send fail with "No peers to notify".
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 1)
+        val viewModel = viewModel(communityRepository, nudgeRepository = nudgeRepository)
+        viewModel.onMemberClicked(member("peer", MemberStatus.CRISIS))
+
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+
+        assertNull(nudgeRepository.lastSentNudge)
+        assertEquals(0, viewModel.uiState.value.sentLevelOf(InterventionType.GREYSCALE))
+    }
+
+    @Test
+    fun `switching peer restarts the escalation from the first level`() {
+        val nudgeRepository = HelpFakeNudgeRepository()
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 2)
+        val viewModel = viewModel(communityRepository, nudgeRepository = nudgeRepository)
+        viewModel.onMemberClicked(member("first", MemberStatus.CRISIS))
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+
+        viewModel.onMemberClicked(member("second", MemberStatus.CRISIS))
+
+        assertEquals(0, viewModel.uiState.value.sentLevelOf(InterventionType.GREYSCALE))
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+        assertEquals(Nudge.GreyscaleLevel(level = 1), nudgeRepository.lastSentNudge)
+        assertEquals("second", nudgeRepository.lastSentTarget)
+    }
+
+    @Test
+    fun `a peer stays selected after a send so a progressive nudge can be escalated`() {
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 2)
+        val viewModel = viewModel(communityRepository)
+        val peer = member("peer", MemberStatus.CRISIS)
+        viewModel.onMemberClicked(peer)
+
+        viewModel.onInterventionClicked(InterventionType.HAPTIC)
+
+        assertEquals(peer, viewModel.uiState.value.selectedPeer)
+    }
+
+    @Test
+    fun `an intervention with variants opens its option dialog instead of sending`() {
+        val nudgeRepository = HelpFakeNudgeRepository()
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 2)
+        val viewModel = viewModel(communityRepository, nudgeRepository = nudgeRepository)
+        viewModel.onMemberClicked(member("peer", MemberStatus.CRISIS))
+
+        viewModel.onInterventionClicked(InterventionType.TEXT)
+
+        assertEquals(InterventionType.TEXT, viewModel.uiState.value.optionPickerFor)
+        assertNull(nudgeRepository.lastSentNudge)
+    }
+
+    @Test
+    fun `an intervention with no variants sends straight away`() {
+        val nudgeRepository = HelpFakeNudgeRepository()
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 2)
+        val viewModel = viewModel(communityRepository, nudgeRepository = nudgeRepository)
+        viewModel.onMemberClicked(member("peer", MemberStatus.CRISIS))
+
+        viewModel.onInterventionClicked(InterventionType.HAPTIC)
+
+        assertEquals(Nudge.Haptic, nudgeRepository.lastSentNudge)
+        assertNull(viewModel.uiState.value.optionPickerFor)
+    }
+
+    @Test
+    fun `tapping an intervention with nobody selected does nothing`() {
+        val nudgeRepository = HelpFakeNudgeRepository()
+        val communityRepository = HelpFakeCommunityRepository("comm-1", memberCount = 2)
+        val viewModel = viewModel(communityRepository, nudgeRepository = nudgeRepository)
+
+        viewModel.onInterventionClicked(InterventionType.HAPTIC)
+
+        assertNull(nudgeRepository.lastSentNudge)
+        assertNull(viewModel.uiState.value.optionPickerFor)
+    }
+
+    @Test
+    fun `dismissing the option dialog keeps the peer selected`() {
+        val viewModel = viewModel(HelpFakeCommunityRepository("comm-1"))
+        val peer = member("peer", MemberStatus.CRISIS)
+        viewModel.onMemberClicked(peer)
+        viewModel.onInterventionClicked(InterventionType.GREYSCALE)
+
+        viewModel.onOptionPickerDismissed()
+
+        assertNull(viewModel.uiState.value.optionPickerFor)
+        assertEquals(peer, viewModel.uiState.value.selectedPeer)
+    }
+
+    @Test
+    fun `a peer who recovers while selected stops being a target and closes any dialog`() {
         val roster = rosterOf(member(SELF_ID), member("peer", MemberStatus.CRISIS))
         val viewModel = viewModel(HelpFakeCommunityRepository("comm-1", roster))
         viewModel.onMemberClicked(viewModel.uiState.value.peersNeedingHelp.single())
+        viewModel.onInterventionClicked(InterventionType.TEXT)
 
         roster.value = CommunityState(
             "comm-1",
@@ -205,7 +346,8 @@ class HelpViewModelTest {
         )
 
         assertTrue(viewModel.uiState.value.peersNeedingHelp.isEmpty())
-        assertNull(viewModel.uiState.value.nudgeTarget)
+        assertNull(viewModel.uiState.value.selectedPeer)
+        assertNull(viewModel.uiState.value.optionPickerFor)
     }
 
     @Test
@@ -220,7 +362,6 @@ class HelpViewModelTest {
         assertEquals("peer", nudgeRepository.lastSentTarget)
         assertEquals(Nudge.Haptic, nudgeRepository.lastSentNudge)
         assertEquals("Nudge sent to nick-peer", viewModel.uiState.value.nudgeFeedback)
-        assertNull(viewModel.uiState.value.nudgeTarget)
     }
 
     @Test

@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.HelpCircle" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Window themes only: everything inside the window is styled by HelpCircleTheme in Compose.
+         Their one real job is the window background, which is what the system paints before the
+         first frame is composed — if it doesn't match the Compose surface the app flashes the wrong
+         colour on every launch. See values-night/themes.xml for the dark counterparts. -->
+
+    <style name="Theme.HelpCircle" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 
     <!-- Floating dialog window, not full-screen, for the System Fallback prompt launched from the
          accessibility service — keeps it a "non-intrusive" overlay rather than taking over the screen. -->

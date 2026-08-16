@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -14,7 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import com.project.helpcircle.ui.theme.Elevation
+import com.project.helpcircle.ui.theme.Shapes
+import com.project.helpcircle.ui.theme.Spacing
 
 /**
  * Shown across every main tab whenever passive monitoring isn't actually running. Without it the
@@ -29,10 +32,15 @@ fun MonitoringDisabledBanner(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        shape = Shapes.card,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -41,7 +49,7 @@ fun MonitoringDisabledBanner(
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(Spacing.xs))
             Text(
                 text = "Your circle can't see when you need support until this is back on. " +
                     "Some phones switch it off automatically after a while.",
@@ -49,8 +57,19 @@ fun MonitoringDisabledBanner(
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(onClick = onTurnBackOnClicked, modifier = Modifier.fillMaxWidth()) {
+            Spacer(modifier = Modifier.height(Spacing.lg))
+            // Deliberately the scheme's error red rather than the primary blue: this button is the
+            // one thing standing between the user and silent, undetected failure, so it should read
+            // as an alarm rather than as an ordinary action.
+            Button(
+                onClick = onTurnBackOnClicked,
+                modifier = Modifier.fillMaxWidth(),
+                shape = Shapes.pill,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
                 Text("Turn monitoring back on")
             }
         }

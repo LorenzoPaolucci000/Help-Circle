@@ -10,6 +10,7 @@ import com.project.helpcircle.presentation.community.JoinCommunityScreen
 import com.project.helpcircle.presentation.onboarding.AccessibilityPermissionScreen
 import com.project.helpcircle.presentation.onboarding.NicknameSetupScreen
 import com.project.helpcircle.presentation.onboarding.SelectMonitoredAppsScreen
+import com.project.helpcircle.presentation.onboarding.WelcomeScreen
 import com.project.helpcircle.presentation.startup.StartupDestination
 import com.project.helpcircle.presentation.startup.StartupScreen
 
@@ -27,12 +28,23 @@ fun HelpCircleNavHost(
             StartupScreen(
                 onDestinationResolved = { destination ->
                     val route = when (destination) {
-                        StartupDestination.NICKNAME_SETUP -> Destination.NicknameSetup.route
+                        // A user with no nickname yet is a first-run user, so they start at the
+                        // welcome screen rather than being asked for a nickname cold.
+                        StartupDestination.NICKNAME_SETUP -> Destination.Welcome.route
                         StartupDestination.JOIN_COMMUNITY -> Destination.JoinCommunity.route
                         StartupDestination.COMMUNITY_DASHBOARD -> Destination.MainTabs.route
                     }
                     navController.navigate(route) {
                         popUpTo(Destination.Startup.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(Destination.Welcome.route) {
+            WelcomeScreen(
+                onGetStarted = {
+                    navController.navigate(Destination.NicknameSetup.route) {
+                        popUpTo(Destination.Welcome.route) { inclusive = true }
                     }
                 }
             )

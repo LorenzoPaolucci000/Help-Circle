@@ -1,49 +1,51 @@
 package com.project.helpcircle.presentation.community
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunitySatisfaction
-import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.VisualLandscape
+import com.project.helpcircle.presentation.common.EmptyState
+import com.project.helpcircle.presentation.common.FillBar
+import com.project.helpcircle.presentation.common.HeroCard
+import com.project.helpcircle.presentation.common.IndexRing
+import com.project.helpcircle.presentation.common.MetaChip
+import com.project.helpcircle.presentation.common.ScreenColumn
+import com.project.helpcircle.presentation.common.ScreenHeader
+import com.project.helpcircle.presentation.common.SecondaryButton
+import com.project.helpcircle.presentation.common.SectionCard
+import com.project.helpcircle.presentation.common.StatusDot
+import com.project.helpcircle.presentation.common.statusLabel
+import com.project.helpcircle.ui.theme.Shapes
+import com.project.helpcircle.ui.theme.Sizes
+import com.project.helpcircle.ui.theme.Spacing
+import com.project.helpcircle.ui.theme.landscapeGradient
+import com.project.helpcircle.ui.theme.landscapeOnColor
+import com.project.helpcircle.ui.theme.scoreBandColor
+import com.project.helpcircle.ui.theme.trendColor
 
 /** Entry point: hoists [CommunityDashboardViewModel] state and hands it to the stateless content below. */
 @Composable
@@ -60,56 +62,187 @@ private fun CommunityDashboardContent(
     uiState: CommunityDashboardUiState,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        LivingLandscapeBackground(landscape = uiState.visualLandscape, modifier = Modifier.fillMaxSize())
+    when {
+        uiState.isLoading -> Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
 
-        when {
-            uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        !uiState.hasActiveCommunity -> Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            EmptyState(
+                title = "No circle yet",
+                detail = "You haven't joined a community yet.",
+                modifier = Modifier.padding(Spacing.xxl),
+                centered = true
+            )
+        }
 
-            !uiState.hasActiveCommunity -> Text(
-                text = "You haven't joined a community yet.",
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(32.dp),
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface
+        else -> ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
+            ScreenHeader(
+                overline = "Your circle",
+                title = uiState.inviteCode.ifBlank { "Community" },
+                trailing = {
+                    MetaChip(text = if (uiState.isSolo) "Just you" else "${uiState.members.size} members")
+                }
             )
 
-            else -> Column(modifier = Modifier.fillMaxSize()) {
-                if (uiState.isSolo) {
-                    SoloModeBanner(
-                        inviteCode = uiState.inviteCode,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    )
+            LandscapeHero(
+                landscape = uiState.visualLandscape,
+                collectiveIndex = if (uiState.isSolo) null else uiState.collectiveIndex
+            )
+
+            if (uiState.isSolo) {
+                InviteCodeCard(inviteCode = uiState.inviteCode)
+            } else {
+                CollectiveIndexCard(
+                    collectiveIndex = uiState.collectiveIndex,
+                    latestWeekly = uiState.latestWeeklyCollectiveIndex,
+                    previousWeekly = uiState.previousWeeklyCollectiveIndex
+                )
+                if (uiState.communitySatisfaction != null) {
+                    CommunitySatisfactionCard(satisfaction = uiState.communitySatisfaction)
                 }
+            }
+
+            MemberRosterCard(members = uiState.members, isSolo = uiState.isSolo)
+        }
+    }
+}
+
+/**
+ * The community's shared mood, as a gradient landscape band keyed to [VisualLandscape].
+ *
+ * This used to be painted across the whole screen, which forced every other element on the
+ * dashboard to draw itself in hardcoded white so it would stay legible on top. Confining it to its
+ * own card lets the rest of the screen use ordinary theme colors, which is what makes the dashboard
+ * work in dark mode at all.
+ */
+@Composable
+private fun LandscapeHero(
+    landscape: VisualLandscape,
+    collectiveIndex: Int?,
+    modifier: Modifier = Modifier
+) {
+    val (topColor, bottomColor) = landscapeGradient(landscape)
+    val animatedTop by animateColorAsState(targetValue = topColor, animationSpec = tween(800), label = "landscapeTop")
+    val animatedBottom by animateColorAsState(targetValue = bottomColor, animationSpec = tween(800), label = "landscapeBottom")
+    val onLandscape = landscapeOnColor(landscape)
+
+    HeroCard(
+        modifier = modifier,
+        brush = Brush.verticalGradient(colors = listOf(animatedTop, animatedBottom)),
+        contentColor = onLandscape
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.xl),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                MetaChip(
+                    text = landscapeLabel(landscape),
+                    containerColor = onLandscape.copy(alpha = 0.18f),
+                    contentColor = onLandscape
+                )
+                Spacer(modifier = Modifier.height(Spacing.md))
+                Text(
+                    text = "COLLECTIVE WELLBEING",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = onLandscape.copy(alpha = 0.75f)
+                )
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Text(
+                    text = landscapePhrase(landscape, isSolo = collectiveIndex == null),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = onLandscape
+                )
+            }
+            if (collectiveIndex != null) {
+                Spacer(modifier = Modifier.height(Spacing.md))
                 Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    CollectiveIndexDisplay(collectiveIndex = if (uiState.isSolo) null else uiState.collectiveIndex)
-                    if (!uiState.isSolo && uiState.latestWeeklyCollectiveIndex != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        CommunityWeeklyTrendCaption(
-                            latest = uiState.latestWeeklyCollectiveIndex,
-                            previous = uiState.previousWeeklyCollectiveIndex
+                        .background(
+                            color = onLandscape.copy(alpha = 0.18f),
+                            shape = Shapes.pill
                         )
-                    }
-                    if (!uiState.isSolo && uiState.communitySatisfaction != null) {
-                        Spacer(modifier = Modifier.height(28.dp))
-                        CommunitySatisfactionBar(satisfaction = uiState.communitySatisfaction)
-                    }
-                    Spacer(modifier = Modifier.height(40.dp))
-                    if (uiState.isSolo) {
-                        EmptyPeersState()
-                    } else {
-                        MemberStatusRow(members = uiState.members)
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = collectiveIndex.toString(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = onLandscape
+                    )
+                    Text(
+                        text = "/ 100",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onLandscape.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * IA_comm as a ring, with the weekly comparison beneath it.
+ *
+ * The trend is built from snapshots this device recorded locally — see
+ * [ObserveCommunityWeeklyTrendUseCase][com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase]
+ * for why a peer's device can hold a different number for the same week.
+ */
+@Composable
+private fun CollectiveIndexCard(
+    collectiveIndex: Int,
+    latestWeekly: Int?,
+    previousWeekly: Int?,
+    modifier: Modifier = Modifier
+) {
+    val weeklyDelta = if (latestWeekly != null && previousWeekly != null) latestWeekly - previousWeekly else null
+    SectionCard(
+        modifier = modifier,
+        title = "Collective agency score",
+        subtitle = "This week · IA_comm",
+        trailing = weeklyDelta?.let { delta ->
+            {
+                MetaChip(
+                    text = if (delta >= 0) "+$delta pts this week" else "$delta pts this week",
+                    containerColor = trendColor(delta).copy(alpha = 0.18f),
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xl)
+        ) {
+            IndexRing(value = collectiveIndex)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "The average of everyone's agency index, plus a bonus when the whole " +
+                        "circle is holding steady.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (latestWeekly != null) {
+                    Spacer(modifier = Modifier.height(Spacing.md))
+                    Text(
+                        text = "Last week: $latestWeekly",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (previousWeekly != null) {
+                        Text(
+                            text = "The week before: $previousWeekly",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -117,192 +250,76 @@ private fun CommunityDashboardContent(
     }
 }
 
-/** Background gradient that reflects the community's shared [VisualLandscape] mood. */
-@Composable
-private fun LivingLandscapeBackground(landscape: VisualLandscape, modifier: Modifier = Modifier) {
-    val (topColor, bottomColor) = landscapeColors(landscape)
-    val animatedTop by animateColorAsState(targetValue = topColor, animationSpec = tween(800), label = "landscapeTop")
-    val animatedBottom by animateColorAsState(targetValue = bottomColor, animationSpec = tween(800), label = "landscapeBottom")
-
-    Box(
-        modifier = modifier.background(
-            Brush.verticalGradient(colors = listOf(animatedTop, animatedBottom))
-        )
-    )
-}
-
-private fun landscapeColors(landscape: VisualLandscape): Pair<Color, Color> = when (landscape) {
-    VisualLandscape.TEMPEST -> Color(0xFF263238) to Color(0xFF0B0F12)
-    VisualLandscape.RAINY -> Color(0xFF607D8B) to Color(0xFF455A64)
-    VisualLandscape.MISTY -> Color(0xFFCFD8DC) to Color(0xFFA6B4B8)
-    VisualLandscape.SERENE -> Color(0xFF81C7D4) to Color(0xFF4F9A94)
-    VisualLandscape.FLOURISHING -> Color(0xFFFFE082) to Color(0xFF8BC34A)
-}
-
-/** Large, central IA_comm score; shows "--" when solo, since one member has nothing to average. */
-@Composable
-private fun CollectiveIndexDisplay(collectiveIndex: Int?, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = collectiveIndex?.toString() ?: "--",
-            fontSize = 96.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            text = "Community Agency Index",
-            fontSize = 16.sp,
-            color = Color.White.copy(alpha = 0.85f)
-        )
-    }
-}
-
 /**
- * "Vs. last week" caption for the community's IA_comm, built from snapshots this device has
- * recorded locally — see [ObserveCommunityWeeklyTrendUseCase][com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase]
- * for why this can differ from what a peer's own device shows.
- */
-@Composable
-private fun CommunityWeeklyTrendCaption(latest: Int, previous: Int?, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "Last week: $latest",
-            fontSize = 14.sp,
-            color = Color.White.copy(alpha = 0.85f)
-        )
-        if (previous != null) {
-            Text(
-                text = "The week before: $previous",
-                fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.7f)
-            )
-        }
-    }
-}
-
-/**
- * The circle's collective self-evaluation for the week in progress: a bar whose fill and color
- * both track the average of the members who have rated it.
+ * The circle's collective self-evaluation for the week in progress: a bar whose fill and color both
+ * track the average of the members who rated it.
  *
- * Deliberately distinct from the IA_comm number above it — that one is derived from detected
- * behavior, this one from what people say about themselves — so the two are never merged into a
- * single figure even though both land on a 0-100 scale.
+ * Deliberately distinct from the IA_comm number above — that one is derived from detected behavior,
+ * this one from what people say about themselves — so the two are never merged into a single figure
+ * even though both land on a 0-100 scale.
  */
 @Composable
-private fun CommunitySatisfactionBar(satisfaction: CommunitySatisfaction, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "Circle mood this week",
-            fontSize = 14.sp,
-            color = Color.White.copy(alpha = 0.85f)
-        )
-        Spacer(modifier = Modifier.height(10.dp))
+private fun CommunitySatisfactionCard(
+    satisfaction: CommunitySatisfaction,
+    modifier: Modifier = Modifier
+) {
+    SectionCard(
+        modifier = modifier,
+        title = "Circle mood",
+        subtitle = "How the week in progress feels, in everyone's own words"
+    ) {
         if (!satisfaction.hasRatings) {
-            Text(
-                text = "Nobody has rated this week yet.",
-                fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
+            EmptyState(
+                title = "Nobody has rated this week yet",
+                detail = "Ratings appear here as people fill them in on their own Me tab."
             )
-            return@Column
+            return@SectionCard
         }
 
-        val targetFraction = satisfaction.averageScore / 100f
-        val animatedFraction by animateFloatAsState(
-            // A floor rather than a true zero: an all-negative week should still read as "a bar
-            // pinned to the bottom", not as a missing element.
-            targetValue = targetFraction.coerceIn(0.03f, 1f),
-            animationSpec = tween(600),
-            label = "satisfactionFill"
-        )
         val animatedColor by animateColorAsState(
-            targetValue = satisfactionColor(satisfaction.averageScore),
+            targetValue = scoreBandColor(satisfaction.averageScore),
             animationSpec = tween(600),
             label = "satisfactionColor"
         )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(16.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.25f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(animatedFraction)
-                    .fillMaxHeight()
-                    .clip(CircleShape)
-                    .background(animatedColor)
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
+        FillBar(
+            fraction = satisfaction.averageScore / 100f,
+            color = animatedColor,
+            height = Sizes.barHeight
+        )
+        Spacer(modifier = Modifier.height(Spacing.md))
         Text(
+            // The denominator is the whole circle, not just the raters, so silence stays visible
+            // rather than one happy member rendering the same full bar as five.
             text = "${satisfactionFace(satisfaction.averageScore)}  " +
                 "${satisfaction.ratedMemberCount} of ${satisfaction.memberCount} rated",
-            fontSize = 12.sp,
-            color = Color.White.copy(alpha = 0.8f)
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
-/** Shares the roster's status palette, so "red/amber/green" means the same thing everywhere on this screen. */
-private fun satisfactionColor(averageScore: Int): Color = when {
-    averageScore <= 33 -> Color(0xFFE57373)
-    averageScore <= 66 -> Color(0xFFFFB74D)
-    else -> Color(0xFF66BB6A)
-}
-
-/** The face the circle's average lands closest to, matching the three the home screen offers. */
-private fun satisfactionFace(averageScore: Int): String = when {
-    averageScore <= 33 -> "😞"
-    averageScore <= 66 -> "😐"
-    else -> "😊"
-}
-
-/** Shown in place of the score/roster while this device is the community's only member. */
+/** Shown in place of the score while this device is the community's only member. */
 @Composable
-private fun SoloModeBanner(inviteCode: String, modifier: Modifier = Modifier) {
+private fun InviteCodeCard(inviteCode: String, modifier: Modifier = Modifier) {
     val clipboardManager = LocalClipboardManager.current
-    Card(
+    SectionCard(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
+        title = "Invite your circle",
+        subtitle = "Peer support switches on as soon as somebody joins you.",
+        containerColor = MaterialTheme.colorScheme.primaryContainer
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Invite friends to unlock peer support",
-                style = MaterialTheme.typography.titleSmall,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = inviteCode,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(inviteCode)) }) {
-                Text("Copy code")
-            }
-        }
+        Text(
+            text = inviteCode,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.displaySmall,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(Spacing.lg))
+        SecondaryButton(
+            text = "Copy code",
+            onClick = { clipboardManager.setText(AnnotatedString(inviteCode)) }
+        )
     }
-}
-
-/** Peer-roster empty state: shown instead of [MemberStatusRow] while the circle has no other members. */
-@Composable
-private fun EmptyPeersState(modifier: Modifier = Modifier) {
-    Text(
-        text = "No peers yet. Share your invite code to grow your circle.",
-        modifier = modifier.padding(horizontal = 24.dp),
-        style = MaterialTheme.typography.bodyMedium,
-        color = Color.White.copy(alpha = 0.85f),
-        textAlign = TextAlign.Center
-    )
 }
 
 /**
@@ -311,50 +328,73 @@ private fun EmptyPeersState(modifier: Modifier = Modifier) {
  * nudge is actually appropriate for.
  */
 @Composable
-private fun MemberStatusRow(
+private fun MemberRosterCard(
     members: List<CommunityMember>,
+    isSolo: Boolean,
     modifier: Modifier = Modifier
 ) {
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp)
+    SectionCard(
+        modifier = modifier,
+        title = "Who's here",
+        subtitle = if (isSolo) null else "${members.size} in this circle"
     ) {
-        items(members, key = { it.anonymousId }) { member ->
-            MemberStatusCard(member = member)
+        if (isSolo || members.isEmpty()) {
+            EmptyState(
+                title = "No peers yet",
+                detail = "Share your invite code to grow your circle."
+            )
+            return@SectionCard
+        }
+        members.forEachIndexed { index, member ->
+            if (index > 0) Spacer(modifier = Modifier.height(Spacing.md))
+            MemberRow(member = member)
         }
     }
 }
 
 @Composable
-private fun MemberStatusCard(member: CommunityMember, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+private fun MemberRow(member: CommunityMember, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .height(12.dp)
-                    .fillMaxWidth()
-                    .clip(CircleShape)
-                    .background(statusColor(member.status))
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        StatusDot(status = member.status)
+        Column(modifier = Modifier.padding(start = Spacing.lg)) {
             Text(
                 text = member.nickname.ifBlank { "Anonymous" },
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = statusLabel(member.status),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
-private fun statusColor(status: MemberStatus): Color = when (status) {
-    MemberStatus.OK -> Color(0xFF66BB6A)
-    MemberStatus.AT_RISK -> Color(0xFFFFB74D)
-    MemberStatus.CRISIS -> Color(0xFFE57373)
+private fun landscapeLabel(landscape: VisualLandscape): String = when (landscape) {
+    VisualLandscape.TEMPEST -> "Tempest"
+    VisualLandscape.RAINY -> "Rainy"
+    VisualLandscape.MISTY -> "Misty"
+    VisualLandscape.SERENE -> "Serene"
+    VisualLandscape.FLOURISHING -> "Flourishing"
+}
+
+/** A plain-language reading of the landscape, so the band means something without a legend. */
+private fun landscapePhrase(landscape: VisualLandscape, isSolo: Boolean): String = when {
+    isSolo -> "Your circle is waiting for you"
+    landscape == VisualLandscape.TEMPEST -> "Your circle is struggling"
+    landscape == VisualLandscape.RAINY -> "Your circle is having a hard week"
+    landscape == VisualLandscape.MISTY -> "Your circle is finding its footing"
+    landscape == VisualLandscape.SERENE -> "Your circle is doing well"
+    else -> "Your circle is thriving"
+}
+
+/** The face the circle's average lands closest to, matching the three the home screen offers. */
+private fun satisfactionFace(averageScore: Int): String = when {
+    averageScore <= 33 -> "😞"
+    averageScore <= 66 -> "😐"
+    else -> "😊"
 }
