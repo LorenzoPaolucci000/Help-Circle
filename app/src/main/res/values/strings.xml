@@ -1,7 +1,9 @@
 <resources>
     <string name="app_name">HelpCircle</string>
     <string name="accessibility_service_label">HelpCircle scroll monitor</string>
-    <string name="accessibility_service_description">Watches the timing of scroll and tap gestures on-device to detect doomscrolling patterns. It never reads screen content, and nothing it observes leaves the device.</string>
+    <!-- Must stay in step with accessibilityEventTypes in xml/doomscroll_accessibility_service_config.xml.
+         Taps are deliberately not observed, so this must not claim they are. -->
+    <string name="accessibility_service_description">Watches the timing of scroll gestures on-device to detect doomscrolling patterns. It never reads screen content, and nothing it observes leaves the device.</string>
     <string name="monitoring_channel_name">Doomscroll monitoring</string>
     <string name="monitoring_channel_description">Silent, persistent notice that HelpCircle\'s scroll monitor is active.</string>
     <string name="monitoring_notification_text">HelpCircle is watching over you</string>
