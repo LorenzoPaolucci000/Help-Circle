@@ -25,11 +25,12 @@ import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.common.MonitoringDisabledBanner
 import com.project.helpcircle.presentation.common.MonitoringStatusViewModel
 import com.project.helpcircle.presentation.community.CommunityDashboardScreen
+import com.project.helpcircle.presentation.help.HelpScreen
 import com.project.helpcircle.presentation.home.HomeScreen
 import com.project.helpcircle.presentation.settings.SettingsScreen
 
 /**
- * Hosts the three peer top-level screens (Me/Community/Settings) behind a Material3
+ * Hosts the four peer top-level screens (Me/Community/Help/Settings) behind a Material3
  * [NavigationBar]. Tab switches use the standard "multiple back stacks" pattern
  * (saveState/restoreState + launchSingleTop against the graph's start destination) so each tab
  * keeps its own state when the user switches away and back, rather than resetting on every tap.
@@ -71,8 +72,8 @@ fun MainTabsScreen(
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             // Sits above the tab content rather than inside any one screen: monitoring being off
-            // invalidates what all three tabs are showing, so it shouldn't be dismissible by
-            // switching tabs.
+            // invalidates what every tab is showing, so it shouldn't be dismissible by switching
+            // tabs.
             if (!isMonitoringActive) {
                 MonitoringDisabledBanner(
                     onTurnBackOnClicked = {
@@ -92,6 +93,9 @@ fun MainTabsScreen(
                 }
                 composable(TabDestination.COMMUNITY.route) {
                     CommunityDashboardScreen()
+                }
+                composable(TabDestination.HELP.route) {
+                    HelpScreen()
                 }
                 composable(TabDestination.SETTINGS.route) {
                     SettingsScreen(onLeftCommunity = onLeftCommunity)
