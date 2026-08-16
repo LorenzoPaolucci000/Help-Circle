@@ -28,6 +28,7 @@ import com.project.helpcircle.domain.usecase.ObserveAgencyHomeUseCase
 import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase
+import com.project.helpcircle.domain.usecase.ObserveHelpablePeersUseCase
 import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.ObserveWeeklySatisfactionUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
@@ -129,6 +130,12 @@ object UseCaseModule {
     fun provideObserveCommunityStateUseCase(
         communityRepository: CommunityRepository
     ): ObserveCommunityStateUseCase = ObserveCommunityStateUseCase(communityRepository)
+
+    @Provides
+    fun provideObserveHelpablePeersUseCase(
+        observeCommunityStateUseCase: ObserveCommunityStateUseCase,
+        userRepository: UserRepository
+    ): ObserveHelpablePeersUseCase = ObserveHelpablePeersUseCase(observeCommunityStateUseCase, userRepository)
 
     @Provides
     fun provideObserveCommunityWeeklyTrendUseCase(
