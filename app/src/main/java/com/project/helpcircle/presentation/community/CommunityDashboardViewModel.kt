@@ -3,21 +3,14 @@ package com.project.helpcircle.presentation.community
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.helpcircle.domain.engine.WeeklyResetCalculator
-import com.project.helpcircle.domain.model.ChargeWallet
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityObservation
 import com.project.helpcircle.domain.model.CommunitySatisfaction
-import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.VisualLandscape
 import com.project.helpcircle.domain.repository.CommunityRepository
-import com.project.helpcircle.domain.usecase.NudgeResult
-import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase
-import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
-import com.project.helpcircle.domain.usecase.SendNudgeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +26,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** UI state for [CommunityDashboardScreen]; each member carries only a pseudonym and coarse status, never PII or a raw IA_ind score. */
+/**
+ * UI state for [CommunityDashboardScreen]; each member carries only a pseudonym and coarse status,
+ * never PII or a raw IA_ind score. Purely a read-only picture of how the circle is doing — sending
+ * an intervention lives on the Help screen instead.
+ */
 data class CommunityDashboardUiState(
     val isLoading: Boolean = true,
     val hasActiveCommunity: Boolean = true,
@@ -45,22 +42,14 @@ data class CommunityDashboardUiState(
     val latestWeeklyCollectiveIndex: Int? = null,
     val previousWeeklyCollectiveIndex: Int? = null,
     /** How the circle collectively rates the week in progress; null while solo, since one member isn't a community mood. */
-    val communitySatisfaction: CommunitySatisfaction? = null,
-    val latestNudge: Nudge? = null,
-    val availableCharges: Int = ChargeWallet.MAX_CHARGES,
-    val nudgeTarget: CommunityMember? = null,
-    val isSendingNudge: Boolean = false,
-    val nudgeFeedback: String? = null
+    val communitySatisfaction: CommunitySatisfaction? = null
 )
 
 @HiltViewModel
 class CommunityDashboardViewModel @Inject constructor(
     private val communityRepository: CommunityRepository,
-    private val observeChargeWallet: ObserveChargeWalletUseCase,
     private val observeCommunityState: ObserveCommunityStateUseCase,
-    private val observeCommunityWeeklyTrend: ObserveCommunityWeeklyTrendUseCase,
-    private val observeIncomingNudges: ObserveIncomingNudgesUseCase,
-    private val sendNudge: SendNudgeUseCase
+    private val observeCommunityWeeklyTrend: ObserveCommunityWeeklyTrendUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CommunityDashboardUiState())
@@ -69,7 +58,7 @@ class CommunityDashboardViewModel @Inject constructor(
     // A Firestore listener's error can arrive right as this ViewModel starts being cleared (e.g.
     // this community's tab is kept alive in the background by the bottom nav's multi-back-stack
     // pattern while the user leaves via Settings, then the whole tab host gets torn down the
-    // instant the leave completes) — a race the .catch{} guards below can't fully cover, since by
+    // instant the leave completes) — a race the .catch{} guard below can't fully cover, since by
     // then there's no longer an active downstream collector for a late exception to be routed
     // through, so it would otherwise crash the app instead. This scope is still cancelled together
     // with viewModelScope (same parent Job), but its handler is the backstop that guarantees a
@@ -133,54 +122,6 @@ class CommunityDashboardViewModel @Inject constructor(
                     }
                 }
                 .launchIn(listenerScope)
-        }
-
-        observeIncomingNudges()
-            // Same rationale as above: a rejected nudge listener shouldn't crash the dashboard.
-            .catch { }
-            .onEach { nudge -> _uiState.update { it.copy(latestNudge = nudge) } }
-            .launchIn(listenerScope)
-
-        observeChargeWallet()
-            .onEach { wallet -> _uiState.update { it.copy(availableCharges = wallet.currentCharges) } }
-            .launchIn(viewModelScope)
-    }
-
-    /** Opens the nudge-type picker for the tapped peer. */
-    fun onMemberClicked(member: CommunityMember) {
-        _uiState.update { it.copy(nudgeTarget = member) }
-    }
-
-    fun onNudgePickerDismissed() {
-        _uiState.update { it.copy(nudgeTarget = null) }
-    }
-
-    fun onNudgeFeedbackShown() {
-        _uiState.update { it.copy(nudgeFeedback = null) }
-    }
-
-    fun onNudgeSelected(nudge: Nudge) {
-        val target = _uiState.value.nudgeTarget ?: return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSendingNudge = true) }
-            val communityId = communityRepository.getActiveCommunityId()
-            if (communityId == null) {
-                _uiState.update {
-                    it.copy(isSendingNudge = false, nudgeTarget = null, nudgeFeedback = "No active circle")
-                }
-                return@launch
-            }
-            val feedback = try {
-                when (val result = sendNudge(communityId, target.anonymousId, nudge)) {
-                    is NudgeResult.Sent -> "Nudge sent to ${target.nickname}"
-                    is NudgeResult.Error -> result.message
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: IllegalStateException) {
-                e.message ?: "Not enough charges"
-            }
-            _uiState.update { it.copy(isSendingNudge = false, nudgeTarget = null, nudgeFeedback = feedback) }
         }
     }
 }

@@ -29,7 +29,6 @@ import com.project.helpcircle.domain.usecase.ObserveChargeWalletUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityStateUseCase
 import com.project.helpcircle.domain.usecase.ObserveCommunityWeeklyTrendUseCase
 import com.project.helpcircle.domain.usecase.ObserveHelpablePeersUseCase
-import com.project.helpcircle.domain.usecase.ObserveIncomingNudgesUseCase
 import com.project.helpcircle.domain.usecase.ObserveWeeklySatisfactionUseCase
 import com.project.helpcircle.domain.usecase.SendNudgeUseCase
 import com.project.helpcircle.domain.usecase.StartSystemFallbackBreakUseCase
@@ -141,11 +140,6 @@ object UseCaseModule {
     fun provideObserveCommunityWeeklyTrendUseCase(
         communityWeeklyHistoryRepository: CommunityWeeklyHistoryRepository
     ): ObserveCommunityWeeklyTrendUseCase = ObserveCommunityWeeklyTrendUseCase(communityWeeklyHistoryRepository)
-
-    @Provides
-    fun provideObserveIncomingNudgesUseCase(
-        nudgeRepository: NudgeRepository
-    ): ObserveIncomingNudgesUseCase = ObserveIncomingNudgesUseCase(nudgeRepository)
 
     @Provides
     fun provideValidateNicknameUseCase(): ValidateNicknameUseCase = ValidateNicknameUseCase()
