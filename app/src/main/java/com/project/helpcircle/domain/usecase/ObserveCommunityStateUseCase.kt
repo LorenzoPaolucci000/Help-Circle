@@ -14,7 +14,7 @@ class ObserveCommunityStateUseCase(
     operator fun invoke(communityId: String): Flow<CommunityObservation> =
         communityRepository.observeCommunityState(communityId).map { state ->
             if (state.members.size <= SOLO_MEMBER_COUNT) {
-                CommunityObservation.SoloMode(state.communityId, state.inviteCode)
+                CommunityObservation.SoloMode(state.communityId, state.inviteCode, state.name)
             } else {
                 CommunityObservation.Populated(state)
             }

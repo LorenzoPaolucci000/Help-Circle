@@ -6,7 +6,9 @@ data class CommunityState(
     val memberAgencyIndices: List<AgencyIndex>,
     val cohesionBonusApplied: Boolean,
     val members: List<CommunityMember> = emptyList(),
-    val inviteCode: String = ""
+    val inviteCode: String = "",
+    /** Chosen by whoever created the circle and immutable afterward; blank for circles created before names existed. */
+    val name: String = ""
 ) {
     val collectiveIndex: AgencyIndex
         get() {

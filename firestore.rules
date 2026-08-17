@@ -9,12 +9,21 @@ service cloud.firestore {
 
       // Only activeMembers/lastActivity are client-writable; IA_comm is set only server-side,
       // per the Mathematical Inflation guideline — clients must never self-report their score.
-      // inviteCode may only be set at creation (matching InviteCodeGenerator's shape) and is
-      // immutable afterward — the update rule below never includes it in its allowed keys.
+      // inviteCode and name may only be set at creation and are immutable afterward — the update
+      // rule below never includes either in its allowed keys. inviteCode must match
+      // InviteCodeGenerator's shape; name is bounded by the same 3-20 character limit the
+      // nickname validation applies, since a circle's name is chosen the same way.
+      //
+      // name is validated only when present rather than required, so a client build that predates
+      // the feature can still create a circle against these rules.
       allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['activeMembers', 'lastActivity', 'inviteCode'])
+        && request.resource.data.keys().hasOnly(['activeMembers', 'lastActivity', 'inviteCode', 'name'])
         && request.resource.data.inviteCode is string
-        && request.resource.data.inviteCode.matches('^[A-Z0-9]{6}$');
+        && request.resource.data.inviteCode.matches('^[A-Z0-9]{6}$')
+        && (!('name' in request.resource.data.keys())
+             || (request.resource.data.name is string
+                 && request.resource.data.name.size() >= 3
+                 && request.resource.data.name.size() <= 20));
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeMembers', 'lastActivity']);
       allow delete: if false;

@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,12 +31,14 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.project.helpcircle.domain.usecase.NicknameValidationResult
 import com.project.helpcircle.presentation.common.MonitoredAppsRequiredBanner
 import com.project.helpcircle.presentation.common.PrimaryButton
 import com.project.helpcircle.presentation.common.ScreenColumn
 import com.project.helpcircle.presentation.common.SecondaryButton
 import com.project.helpcircle.presentation.common.SectionCard
 import com.project.helpcircle.presentation.common.StepProgressHeader
+import com.project.helpcircle.presentation.common.nicknameValidationMessage
 import com.project.helpcircle.presentation.onboarding.ONBOARDING_STEP_COUNT
 import com.project.helpcircle.ui.theme.Shapes
 import com.project.helpcircle.ui.theme.Spacing
@@ -58,9 +61,12 @@ fun JoinCommunityScreen(
         uiState = uiState,
         onTabSelected = viewModel::onTabSelected,
         onInviteCodeInputChanged = viewModel::onInviteCodeInputChanged,
+        onCommunityNameChanged = viewModel::onCommunityNameChanged,
+        onGenerateCommunityNameClicked = viewModel::onGenerateCommunityNameClicked,
         onJoinClicked = viewModel::onJoinClicked,
         onCreateClicked = viewModel::onCreateClicked,
         onContinueAfterCreateClicked = viewModel::onContinueAfterCreateClicked,
+        onContinueAfterJoinClicked = viewModel::onContinueAfterJoinClicked,
         onGoToMonitoredApps = onGoToMonitoredApps,
         modifier = modifier
     )
@@ -76,9 +82,12 @@ private fun JoinCommunityContent(
     uiState: JoinCommunityUiState,
     onTabSelected: (JoinCommunityTab) -> Unit,
     onInviteCodeInputChanged: (String) -> Unit,
+    onCommunityNameChanged: (String) -> Unit,
+    onGenerateCommunityNameClicked: () -> Unit,
     onJoinClicked: () -> Unit,
     onCreateClicked: () -> Unit,
     onContinueAfterCreateClicked: () -> Unit,
+    onContinueAfterJoinClicked: () -> Unit,
     onGoToMonitoredApps: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,11 +106,23 @@ private fun JoinCommunityContent(
         return
     }
 
+    // Likewise once a circle has been joined: naming what was joined is all that's left to say.
+    val joinedCommunityName = uiState.joinedCommunityName
+    if (joinedCommunityName != null) {
+        JoinedCircleContent(
+            communityName = joinedCommunityName,
+            onContinue = onContinueAfterJoinClicked,
+            modifier = modifier
+        )
+        return
+    }
+
     // Once a circle exists there is nothing left to choose, so the options give way to the code.
     val createdInviteCode = uiState.createdInviteCode
     if (createdInviteCode != null) {
         CreatedCircleContent(
             inviteCode = createdInviteCode,
+            communityName = uiState.createdCommunityName.orEmpty(),
             onContinue = onContinueAfterCreateClicked,
             modifier = modifier
         )
@@ -163,6 +184,26 @@ private fun JoinCommunityContent(
             }
 
             JoinCommunityTab.CREATE -> {
+                OutlinedTextField(
+                    value = uiState.communityNameInput,
+                    onValueChange = onCommunityNameChanged,
+                    singleLine = true,
+                    shape = Shapes.field,
+                    enabled = !uiState.isCreating,
+                    label = { Text("Circle name") },
+                    placeholder = { Text("e.g. OpenHarbor42") },
+                    isError = uiState.nameValidationResult != null &&
+                        uiState.nameValidationResult != NicknameValidationResult.Valid,
+                    supportingText = {
+                        nicknameValidationMessage(uiState.nameValidationResult)?.let { Text(it) }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TextButton(onClick = onGenerateCommunityNameClicked, enabled = !uiState.isCreating) {
+                        Text("Generate one for me")
+                    }
+                }
                 uiState.createError?.let {
                     Text(
                         text = it,
@@ -175,7 +216,8 @@ private fun JoinCommunityContent(
                 } else {
                     PrimaryButton(
                         text = if (uiState.createTimedOut) "Retry" else "Create a circle",
-                        onClick = onCreateClicked
+                        onClick = onCreateClicked,
+                        enabled = uiState.nameValidationResult == NicknameValidationResult.Valid
                     )
                 }
             }
@@ -240,10 +282,11 @@ private fun CircleOptionCard(
     }
 }
 
-/** Shown after a circle is created: the invite code is the only thing that matters here. */
+/** Shown after a circle is created: the name it was just given, and the code that grows it. */
 @Composable
 private fun CreatedCircleContent(
     inviteCode: String,
+    communityName: String,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -263,6 +306,15 @@ private fun CreatedCircleContent(
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center
             )
+            if (communityName.isNotBlank()) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Text(
+                    text = communityName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+            }
             Spacer(modifier = Modifier.height(Spacing.sm))
             Text(
                 text = "Share this code with people you trust.",
@@ -286,6 +338,51 @@ private fun CreatedCircleContent(
             SecondaryButton(
                 text = "Copy code",
                 onClick = { clipboardManager.setText(AnnotatedString(inviteCode)) }
+            )
+        }
+
+        PrimaryButton(text = "Continue", onClick = onContinue)
+    }
+}
+
+/**
+ * Shown after joining an existing circle. No invite code here — a joiner already has one, and what
+ * they don't yet know is which circle the code they typed actually belongs to.
+ */
+@Composable
+private fun JoinedCircleContent(
+    communityName: String,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
+        StepProgressHeader(step = ONBOARDING_STEP_COUNT, totalSteps = ONBOARDING_STEP_COUNT)
+
+        Spacer(modifier = Modifier.height(Spacing.xxl))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "You're in",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                text = communityName,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Text(
+                text = "Your circle can see when you're struggling, and you can see when they are.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
 

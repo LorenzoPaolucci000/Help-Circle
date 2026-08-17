@@ -107,12 +107,19 @@ class CommunityRepositoryImpl @Inject constructor(
         doc.get().await().toCommunityState(communityId, members)
     }
 
-    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState =
+    override suspend fun createCommunity(
+        communityId: String,
+        inviteCode: String,
+        name: String
+    ): CommunityState =
         retryingOnUnauthenticated {
             val doc = communityDoc(communityId)
             doc.set(
                 mapOf(
                     FIELD_INVITE_CODE to inviteCode,
+                    // Written only here: the security rules leave name out of the allowed update
+                    // keys, so this is the one moment in a circle's life it can be set.
+                    FIELD_NAME to name,
                     // A literal 1, not FieldValue.increment(1): this document doesn't exist yet
                     // when a create is first attempted, and — since communityId is now stable
                     // across retries of the same attempt (see the interface doc) — this write may
@@ -125,15 +132,16 @@ class CommunityRepositoryImpl @Inject constructor(
             activeCommunityDao.upsert(ActiveCommunityEntity(communityId = communityId))
             // No need to re-fetch the member roster or the community doc afterward — a freshly
             // created circle has exactly one member (the caller, just written below) and the invite
-            // code is the one we just wrote, so both are already known locally. This cuts what used
-            // to be 4 sequential network round-trips down to 2.
+            // code and name are the ones we just wrote, so all three are already known locally.
+            // This cuts what used to be 4 sequential network round-trips down to 2.
             val ownMember = writeOwnMemberDoc(communityId, MemberStatus.OK)
             CommunityState(
                 communityId = communityId,
                 memberAgencyIndices = listOf(AgencyIndex.of(ownMember.agencyScore)),
                 cohesionBonusApplied = ownMember.agencyScore >= COHESION_THRESHOLD,
                 members = listOf(ownMember),
-                inviteCode = inviteCode
+                inviteCode = inviteCode,
+                name = name
             )
         }
 
@@ -318,7 +326,10 @@ class CommunityRepositoryImpl @Inject constructor(
             memberAgencyIndices = members.map { AgencyIndex.of(it.agencyScore) },
             cohesionBonusApplied = members.isNotEmpty() && members.all { it.agencyScore >= COHESION_THRESHOLD },
             members = members,
-            inviteCode = getString(FIELD_INVITE_CODE).orEmpty()
+            inviteCode = getString(FIELD_INVITE_CODE).orEmpty(),
+            // Blank for circles created before names existed; every screen showing it falls back to
+            // the invite code, which was the only identifier those circles ever had.
+            name = getString(FIELD_NAME).orEmpty()
         )
     }
 
@@ -378,6 +389,7 @@ class CommunityRepositoryImpl @Inject constructor(
         private const val FIELD_SATISFACTION_WEEK_START = "satisfactionWeekStart"
         private const val FIELD_LAST_SEEN = "lastSeen"
         private const val FIELD_INVITE_CODE = "inviteCode"
+        private const val FIELD_NAME = "name"
 
         /** Minimum per-member agencyScore, held by every member, for the IA_comm cohesion bonus. */
         private const val COHESION_THRESHOLD = 60

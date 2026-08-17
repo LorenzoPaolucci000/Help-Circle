@@ -6,6 +6,8 @@ import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
+import com.project.helpcircle.domain.usecase.NicknameValidationResult
+import com.project.helpcircle.domain.usecase.ValidateNicknameUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -30,7 +32,7 @@ private class JoinCommunityFakeRepository(
     override fun observeCommunityState(communityId: String): Flow<CommunityState> = emptyFlow()
     override suspend fun joinCommunity(communityId: String): CommunityState = throw UnsupportedOperationException()
 
-    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState {
+    override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState {
         // A plain RuntimeException here, deliberately not IllegalStateException, so this stays
         // distinct from the use case's own blacklist-check failure and correctly exercises the
         // ViewModel's generic-exception fallback path rather than colliding with it.
@@ -69,6 +71,7 @@ private fun viewModel(
 ) = JoinCommunityViewModel(
     JoinCommunityByInviteCodeUseCase(repository, monitoredAppsRepository),
     CreateCommunityUseCase(repository, monitoredAppsRepository),
+    ValidateNicknameUseCase(),
     monitoredAppsRepository
 )
 
@@ -117,15 +120,46 @@ class JoinCommunityViewModelTest {
     }
 
     @Test
-    fun `joining a matching code marks the circle as joined`() {
+    fun `joining a matching code confirms which circle before navigating on`() {
+        val matched = CommunityState(
+            "comm-1",
+            emptyList(),
+            cohesionBonusApplied = false,
+            inviteCode = "AB12CD",
+            name = "OpenHarbor42"
+        )
+        val viewModel = viewModel(JoinCommunityFakeRepository(joinResult = matched))
+        viewModel.onInviteCodeInputChanged("AB12CD")
+
+        viewModel.onJoinClicked()
+
+        assertEquals("OpenHarbor42", viewModel.uiState.value.joinedCommunityName)
+        assertEquals(false, viewModel.uiState.value.isJoining)
+        // Not joined yet from the navigation's point of view: the confirmation has to be dismissed.
+        assertEquals(false, viewModel.uiState.value.hasJoined)
+    }
+
+    @Test
+    fun `joining a circle with no name falls back to its invite code`() {
         val matched = CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, inviteCode = "AB12CD")
         val viewModel = viewModel(JoinCommunityFakeRepository(joinResult = matched))
         viewModel.onInviteCodeInputChanged("AB12CD")
 
         viewModel.onJoinClicked()
 
+        assertEquals("AB12CD", viewModel.uiState.value.joinedCommunityName)
+    }
+
+    @Test
+    fun `continuing after join marks the circle as joined`() {
+        val matched = CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, inviteCode = "AB12CD")
+        val viewModel = viewModel(JoinCommunityFakeRepository(joinResult = matched))
+        viewModel.onInviteCodeInputChanged("AB12CD")
+        viewModel.onJoinClicked()
+
+        viewModel.onContinueAfterJoinClicked()
+
         assertTrue(viewModel.uiState.value.hasJoined)
-        assertEquals(false, viewModel.uiState.value.isJoining)
     }
 
     @Test
@@ -150,19 +184,28 @@ class JoinCommunityViewModelTest {
     }
 
     @Test
-    fun `creating a circle stores its generated invite code`() {
-        val created = CommunityState("comm-2", emptyList(), cohesionBonusApplied = false, inviteCode = "ZZ99ZZ")
+    fun `creating a circle stores its generated invite code and chosen name`() {
+        val created = CommunityState(
+            "comm-2",
+            emptyList(),
+            cohesionBonusApplied = false,
+            inviteCode = "ZZ99ZZ",
+            name = "OpenHarbor42"
+        )
         val viewModel = viewModel(JoinCommunityFakeRepository(createResult = created))
+        viewModel.onCommunityNameChanged("OpenHarbor42")
 
         viewModel.onCreateClicked()
 
         assertEquals("ZZ99ZZ", viewModel.uiState.value.createdInviteCode)
+        assertEquals("OpenHarbor42", viewModel.uiState.value.createdCommunityName)
         assertEquals(false, viewModel.uiState.value.isCreating)
     }
 
     @Test
     fun `a repository failure while creating shows a generic retry error`() {
         val viewModel = viewModel(JoinCommunityFakeRepository(createThrows = true))
+        viewModel.onCommunityNameChanged("OpenHarbor42")
 
         viewModel.onCreateClicked()
 
@@ -219,10 +262,44 @@ class JoinCommunityViewModelTest {
             JoinCommunityFakeRepository(),
             monitoredAppsRepository = JoinCommunityFakeMonitoredAppsRepository(emptySet())
         )
+        viewModel.onCommunityNameChanged("OpenHarbor42")
 
         viewModel.onCreateClicked()
 
         assertEquals("Add at least one app to monitor first", viewModel.uiState.value.createError)
         assertNull(viewModel.uiState.value.createdInviteCode)
+    }
+
+    @Test
+    fun `an invalid circle name blocks creating and reports why`() {
+        val viewModel = viewModel(JoinCommunityFakeRepository())
+
+        viewModel.onCommunityNameChanged("ab")
+        viewModel.onCreateClicked()
+
+        assertEquals(NicknameValidationResult.TooShort, viewModel.uiState.value.nameValidationResult)
+        assertNull(viewModel.uiState.value.createdInviteCode)
+    }
+
+    @Test
+    fun `an empty circle name shows no error yet, but still blocks creating`() {
+        val viewModel = viewModel(JoinCommunityFakeRepository())
+
+        viewModel.onCommunityNameChanged("")
+        viewModel.onCreateClicked()
+
+        assertNull(viewModel.uiState.value.nameValidationResult)
+        assertEquals(false, viewModel.uiState.value.isCreating)
+        assertNull(viewModel.uiState.value.createdInviteCode)
+    }
+
+    @Test
+    fun `generating a circle name fills the field with a valid one`() {
+        val viewModel = viewModel(JoinCommunityFakeRepository())
+
+        viewModel.onGenerateCommunityNameClicked()
+
+        assertTrue(viewModel.uiState.value.communityNameInput.isNotBlank())
+        assertEquals(NicknameValidationResult.Valid, viewModel.uiState.value.nameValidationResult)
     }
 }

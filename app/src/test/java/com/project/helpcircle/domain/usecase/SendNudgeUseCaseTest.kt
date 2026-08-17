@@ -36,7 +36,7 @@ private class SendNudgeFakeCommunityRepository(private val memberCount: Int) : C
     override fun observeCommunityState(communityId: String): Flow<CommunityState> = emptyFlow()
     override suspend fun joinCommunity(communityId: String): CommunityState =
         throw UnsupportedOperationException()
-    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState =
+    override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState =
         throw UnsupportedOperationException()
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit

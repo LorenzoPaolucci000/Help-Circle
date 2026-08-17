@@ -76,7 +76,7 @@ private class HomeViewModelFakeCommunityRepository(
     override suspend fun joinCommunity(communityId: String): CommunityState =
         CommunityState(communityId, emptyList(), cohesionBonusApplied = false)
 
-    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState =
+    override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState =
         CommunityState(communityId, emptyList(), cohesionBonusApplied = false)
 
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null

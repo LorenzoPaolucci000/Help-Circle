@@ -82,7 +82,8 @@ private fun CommunityDashboardContent(
         else -> ScreenColumn(modifier = modifier, verticalSpacing = Spacing.lg) {
             ScreenHeader(
                 overline = "Your circle",
-                title = uiState.inviteCode.ifBlank { "Community" },
+                // A circle created before names existed has only ever been identified by its code.
+                title = uiState.communityName.ifBlank { uiState.inviteCode.ifBlank { "Community" } },
                 trailing = {
                     MetaChip(text = if (uiState.isSolo) "Just you" else "${uiState.members.size} members")
                 }

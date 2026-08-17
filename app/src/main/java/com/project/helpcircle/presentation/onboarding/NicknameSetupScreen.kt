@@ -21,6 +21,7 @@ import com.project.helpcircle.presentation.common.MetaChip
 import com.project.helpcircle.presentation.common.PrimaryButton
 import com.project.helpcircle.presentation.common.ScreenColumn
 import com.project.helpcircle.presentation.common.StepProgressHeader
+import com.project.helpcircle.presentation.common.nicknameValidationMessage
 import com.project.helpcircle.ui.theme.Shapes
 import com.project.helpcircle.ui.theme.Spacing
 
@@ -86,7 +87,7 @@ private fun NicknameSetupContent(
             label = { Text("Nickname") },
             placeholder = { Text("e.g. quiet-otter") },
             isError = uiState.validationResult != null && uiState.validationResult != NicknameValidationResult.Valid,
-            supportingText = { validationMessage(uiState.validationResult)?.let { Text(it) } },
+            supportingText = { nicknameValidationMessage(uiState.validationResult)?.let { Text(it) } },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -106,11 +107,4 @@ private fun NicknameSetupContent(
             enabled = uiState.validationResult == NicknameValidationResult.Valid && !uiState.isSaving
         )
     }
-}
-
-private fun validationMessage(result: NicknameValidationResult?): String? = when (result) {
-    NicknameValidationResult.TooShort -> "At least 3 characters"
-    NicknameValidationResult.TooLong -> "At most 20 characters"
-    NicknameValidationResult.InvalidCharacters -> "Letters and numbers only"
-    NicknameValidationResult.Valid, null -> null
 }

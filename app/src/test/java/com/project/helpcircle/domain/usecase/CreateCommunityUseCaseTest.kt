@@ -15,6 +15,7 @@ import org.junit.Test
 private class CreateCommunityFakeRepository(var throwOnCreate: Boolean = false) : CommunityRepository {
     var lastCreatedInviteCode: String? = null
     val createdCommunityIds = mutableListOf<String>()
+    val createdNames = mutableListOf<String>()
 
     override fun observeCommunityState(communityId: String): Flow<CommunityState> =
         flowOf(CommunityState(communityId, emptyList(), cohesionBonusApplied = false))
@@ -22,11 +23,18 @@ private class CreateCommunityFakeRepository(var throwOnCreate: Boolean = false) 
     override suspend fun joinCommunity(communityId: String): CommunityState =
         CommunityState(communityId, emptyList(), cohesionBonusApplied = false)
 
-    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState {
+    override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState {
         createdCommunityIds += communityId
+        createdNames += name
         if (throwOnCreate) throw RuntimeException("boom")
         lastCreatedInviteCode = inviteCode
-        return CommunityState(communityId, emptyList(), cohesionBonusApplied = false, inviteCode = inviteCode)
+        return CommunityState(
+            communityId,
+            emptyList(),
+            cohesionBonusApplied = false,
+            inviteCode = inviteCode,
+            name = name
+        )
     }
 
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
@@ -96,6 +104,43 @@ class CreateCommunityUseCaseTest {
         assertEquals(2, repository.createdCommunityIds.size)
         assertEquals(repository.createdCommunityIds[0], repository.createdCommunityIds[1])
         assertEquals(repository.createdCommunityIds[1], state.communityId)
+    }
+
+    @Test
+    fun `passes the chosen name through, trimmed`() = runBlocking {
+        val repository = CreateCommunityFakeRepository()
+
+        val state = CreateCommunityUseCase(repository, CreateCommunityFakeMonitoredAppsRepository())("  OpenHarbor42  ")
+
+        assertEquals("OpenHarbor42", repository.createdNames.single())
+        assertEquals("OpenHarbor42", state.name)
+    }
+
+    @Test
+    fun `generates a valid name when none is supplied`() = runBlocking {
+        val repository = CreateCommunityFakeRepository()
+
+        val state = CreateCommunityUseCase(repository, CreateCommunityFakeMonitoredAppsRepository())()
+
+        assertEquals(NicknameValidationResult.Valid, ValidateNicknameUseCase()(state.name))
+        assertEquals(repository.createdNames.single(), state.name)
+    }
+
+    @Test
+    fun `retrying after a failed attempt reuses the same generated name`() = runBlocking {
+        val repository = CreateCommunityFakeRepository(throwOnCreate = true)
+        val useCase = CreateCommunityUseCase(repository, CreateCommunityFakeMonitoredAppsRepository())
+
+        try {
+            useCase()
+        } catch (e: RuntimeException) {
+            // Expected: the point is what the retry below writes, not this failure.
+        }
+        repository.throwOnCreate = false
+        useCase()
+
+        assertEquals(2, repository.createdNames.size)
+        assertEquals(repository.createdNames[0], repository.createdNames[1])
     }
 
     @Test

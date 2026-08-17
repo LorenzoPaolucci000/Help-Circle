@@ -2,9 +2,12 @@ package com.project.helpcircle.presentation.community
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.helpcircle.domain.model.CommunityNameGenerator
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.JoinCommunityByInviteCodeUseCase
+import com.project.helpcircle.domain.usecase.NicknameValidationResult
+import com.project.helpcircle.domain.usecase.ValidateNicknameUseCase
 import com.project.helpcircle.presentation.common.NETWORK_TIMEOUT_MILLIS
 import com.project.helpcircle.presentation.common.SLOW_CONNECTION_MESSAGE
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,10 +31,15 @@ data class JoinCommunityUiState(
     val isJoining: Boolean = false,
     val joinError: String? = null,
     val joinTimedOut: Boolean = false,
+    val joinedCommunityName: String? = null,
+    val communityNameInput: String = "",
+    // Null while the field is empty, so no error is shown before the user has typed anything.
+    val nameValidationResult: NicknameValidationResult? = null,
     val isCreating: Boolean = false,
     val createError: String? = null,
     val createTimedOut: Boolean = false,
     val createdInviteCode: String? = null,
+    val createdCommunityName: String? = null,
     val hasJoined: Boolean = false,
     // Optimistic default so the blocking banner doesn't flash on screen before the first read of
     // the (fast, Room-backed) blacklist actually completes.
@@ -42,6 +50,7 @@ data class JoinCommunityUiState(
 class JoinCommunityViewModel @Inject constructor(
     private val joinCommunityByInviteCode: JoinCommunityByInviteCodeUseCase,
     private val createCommunity: CreateCommunityUseCase,
+    private val validateNickname: ValidateNicknameUseCase,
     monitoredAppsRepository: MonitoredAppsRepository
 ) : ViewModel() {
 
@@ -70,7 +79,15 @@ class JoinCommunityViewModel @Inject constructor(
             try {
                 val joined = withTimeout(NETWORK_TIMEOUT_MILLIS) { joinCommunityByInviteCode(inviteCode) }
                 if (joined != null) {
-                    _uiState.update { it.copy(isJoining = false, hasJoined = true) }
+                    // Confirm which circle was joined before navigating on. Circles created before
+                    // names existed have none, so they fall back to the only identifier they ever
+                    // had — the code the user just typed.
+                    _uiState.update {
+                        it.copy(
+                            isJoining = false,
+                            joinedCommunityName = joined.name.ifBlank { joined.inviteCode.ifBlank { inviteCode } }
+                        )
+                    }
                 } else {
                     _uiState.update { it.copy(isJoining = false, joinError = "Code not found") }
                 }
@@ -93,12 +110,43 @@ class JoinCommunityViewModel @Inject constructor(
         }
     }
 
+    fun onCommunityNameChanged(name: String) {
+        _uiState.update {
+            it.copy(
+                communityNameInput = name,
+                nameValidationResult = if (name.isEmpty()) null else validateNickname(name),
+                createError = null,
+                createTimedOut = false
+            )
+        }
+    }
+
+    fun onGenerateCommunityNameClicked() {
+        val generated = CommunityNameGenerator.generate()
+        _uiState.update {
+            it.copy(
+                communityNameInput = generated,
+                nameValidationResult = validateNickname(generated),
+                createError = null,
+                createTimedOut = false
+            )
+        }
+    }
+
     fun onCreateClicked() {
+        val name = _uiState.value.communityNameInput
+        if (_uiState.value.nameValidationResult != NicknameValidationResult.Valid) return
         viewModelScope.launch {
             _uiState.update { it.copy(isCreating = true, createError = null, createTimedOut = false) }
             try {
-                val state = withTimeout(NETWORK_TIMEOUT_MILLIS) { createCommunity() }
-                _uiState.update { it.copy(isCreating = false, createdInviteCode = state.inviteCode) }
+                val state = withTimeout(NETWORK_TIMEOUT_MILLIS) { createCommunity(name) }
+                _uiState.update {
+                    it.copy(
+                        isCreating = false,
+                        createdInviteCode = state.inviteCode,
+                        createdCommunityName = state.name
+                    )
+                }
             } catch (e: TimeoutCancellationException) {
                 _uiState.update {
                     it.copy(isCreating = false, createError = SLOW_CONNECTION_MESSAGE, createTimedOut = true)
@@ -116,6 +164,10 @@ class JoinCommunityViewModel @Inject constructor(
     }
 
     fun onContinueAfterCreateClicked() {
+        _uiState.update { it.copy(hasJoined = true) }
+    }
+
+    fun onContinueAfterJoinClicked() {
         _uiState.update { it.copy(hasJoined = true) }
     }
 }

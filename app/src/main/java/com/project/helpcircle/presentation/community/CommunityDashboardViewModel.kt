@@ -36,6 +36,8 @@ data class CommunityDashboardUiState(
     val hasActiveCommunity: Boolean = true,
     val isSolo: Boolean = false,
     val inviteCode: String = "",
+    /** Blank for circles created before names existed; the header falls back to the invite code. */
+    val communityName: String = "",
     val collectiveIndex: Int = 50,
     val visualLandscape: VisualLandscape = VisualLandscape.MISTY,
     val members: List<CommunityMember> = emptyList(),
@@ -86,6 +88,7 @@ class CommunityDashboardViewModel @Inject constructor(
                                 hasActiveCommunity = true,
                                 isSolo = false,
                                 inviteCode = observation.state.inviteCode,
+                                communityName = observation.state.name,
                                 collectiveIndex = observation.state.collectiveIndex.value,
                                 visualLandscape = observation.state.visualLandscape,
                                 members = observation.state.members,
@@ -104,6 +107,7 @@ class CommunityDashboardViewModel @Inject constructor(
                                 hasActiveCommunity = true,
                                 isSolo = true,
                                 inviteCode = observation.inviteCode,
+                                communityName = observation.name,
                                 members = emptyList(),
                                 communitySatisfaction = null
                             )

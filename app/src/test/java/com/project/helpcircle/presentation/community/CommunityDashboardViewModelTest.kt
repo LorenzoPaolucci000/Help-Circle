@@ -32,7 +32,7 @@ private class DashboardFakeCommunityRepository(
 ) : CommunityRepository {
     override fun observeCommunityState(communityId: String): Flow<CommunityState> = communityStateFlow
     override suspend fun joinCommunity(communityId: String): CommunityState = throw UnsupportedOperationException()
-    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState = throw UnsupportedOperationException()
+    override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState = throw UnsupportedOperationException()
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
@@ -119,6 +119,51 @@ class CommunityDashboardViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(false, state.isSolo)
         assertEquals(members, state.members)
+    }
+
+    @Test
+    fun `a populated community surfaces its name`() {
+        val members = listOf(member("self"), member("peer"))
+        val stateFlow = MutableStateFlow(
+            CommunityState(
+                "comm-1",
+                emptyList(),
+                cohesionBonusApplied = false,
+                members = members,
+                name = "OpenHarbor42"
+            )
+        )
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1", stateFlow))
+
+        assertEquals("OpenHarbor42", viewModel.uiState.value.communityName)
+    }
+
+    @Test
+    fun `a solo community surfaces its name too`() {
+        val stateFlow = MutableStateFlow(
+            CommunityState(
+                "comm-1",
+                emptyList(),
+                cohesionBonusApplied = false,
+                inviteCode = "AB12CD",
+                name = "OpenHarbor42"
+            )
+        )
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1", stateFlow))
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isSolo)
+        assertEquals("OpenHarbor42", state.communityName)
+    }
+
+    @Test
+    fun `a community created before names existed leaves the name blank`() {
+        val stateFlow = MutableStateFlow(
+            CommunityState("comm-1", emptyList(), cohesionBonusApplied = false, inviteCode = "AB12CD")
+        )
+        val viewModel = viewModel(DashboardFakeCommunityRepository("comm-1", stateFlow))
+
+        assertEquals("", viewModel.uiState.value.communityName)
     }
 
     @Test

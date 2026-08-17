@@ -77,7 +77,7 @@ private class DetectLossFakeCommunityRepository(
     override fun observeCommunityState(communityId: String): Flow<CommunityState> =
         MutableStateFlow(CommunityState(communityId, emptyList(), cohesionBonusApplied = false))
     override suspend fun joinCommunity(communityId: String): CommunityState = throw UnsupportedOperationException()
-    override suspend fun createCommunity(communityId: String, inviteCode: String): CommunityState = throw UnsupportedOperationException()
+    override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState = throw UnsupportedOperationException()
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
