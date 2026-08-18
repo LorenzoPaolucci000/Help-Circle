@@ -11,4 +11,10 @@
     <!-- Mirrors backgroundLight in ui/theme/Color.kt. Kept in sync by hand: the window is painted
          by the platform before Compose runs, so it can't read the Compose color scheme. -->
     <color name="window_background">#FFF9F9FF</color>
+
+    <!-- Backdrop of the launcher icon's adaptive-icon background layer. Matches the tint the
+         source logo artwork is drawn on, so the launcher icon reads as the same image the app
+         itself shows. Deliberately not theme-dependent: the launcher paints this in both light
+         and dark, so there is no night variant. -->
+    <color name="ic_launcher_background">#FFF2F7FB</color>
 </resources>
