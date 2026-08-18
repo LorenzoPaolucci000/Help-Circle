@@ -17,7 +17,8 @@ import com.project.helpcircle.presentation.startup.StartupScreen
 @Composable
 fun HelpCircleNavHost(
     modifier: Modifier = Modifier,
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    initialTab: TabDestination? = null
 ) {
     NavHost(
         navController = navController,
@@ -102,6 +103,7 @@ fun HelpCircleNavHost(
         }
         composable(Destination.MainTabs.route) {
             MainTabsScreen(
+                initialTab = initialTab ?: TabDestination.COMMUNITY,
                 onLeftCommunity = {
                     navController.navigate(Destination.JoinCommunity.route) {
                         popUpTo(Destination.MainTabs.route) { inclusive = true }

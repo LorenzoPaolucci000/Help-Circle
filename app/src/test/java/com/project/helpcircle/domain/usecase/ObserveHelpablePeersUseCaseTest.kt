@@ -36,6 +36,7 @@ private class HelpablePeersFakeCommunityRepository(
         satisfaction: WeeklySatisfaction
     ) = Unit
     override suspend fun leaveCommunity(communityId: String) = Unit
+    override suspend fun ensureAlertSubscription() = Unit
     override suspend fun getActiveCommunityId(): String? = "comm-1"
     override suspend fun getMemberCount(communityId: String): Int = stateFlow.value.members.size
 }

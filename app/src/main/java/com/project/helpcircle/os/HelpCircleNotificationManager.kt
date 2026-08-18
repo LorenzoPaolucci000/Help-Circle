@@ -11,6 +11,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
+import com.project.helpcircle.MainActivity
 import com.project.helpcircle.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicInteger
@@ -63,6 +64,15 @@ class HelpCircleNotificationManager @Inject constructor(
                 description = context.getString(R.string.nudge_channel_description)
             }
         )
+        systemNotificationManager.createNotificationChannel(
+            NotificationChannel(
+                PEER_ALERT_CHANNEL_ID,
+                context.getString(R.string.peer_alert_channel_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = context.getString(R.string.peer_alert_channel_description)
+            }
+        )
     }
 
     fun buildMonitoringNotification(): Notification =
@@ -100,6 +110,52 @@ class HelpCircleNotificationManager @Inject constructor(
         )
     }
 
+    /**
+     * Tells this device that a peer is in crisis. Deliberately keyed on [peerId] rather than an
+     * incrementing counter, so a peer who slips back into a crisis replaces their own earlier
+     * alert instead of stacking a second one; a pile of notifications about the same person is
+     * noise, not urgency.
+     *
+     * Carries no "I'm back" action: that resolves the reader's *own* crisis and would make no
+     * sense here. Tapping opens the Help tab, which is where they can actually do something.
+     */
+    fun postPeerCrisisNotification(peerId: String, nickname: String) {
+        val text = context.getString(R.string.peer_crisis_text)
+        systemNotificationManager.notify(
+            peerAlertNotificationId(peerId),
+            NotificationCompat.Builder(context, PEER_ALERT_CHANNEL_ID)
+                .setContentTitle(context.getString(R.string.peer_crisis_title, nickname))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+                .setAutoCancel(true)
+                .setContentIntent(openHelpTabIntent(peerId))
+                .build()
+        )
+    }
+
+    private fun openHelpTabIntent(peerId: String): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .putExtra(MainActivity.EXTRA_INITIAL_TAB, MainActivity.TAB_HELP)
+        return PendingIntent.getActivity(
+            context,
+            peerAlertNotificationId(peerId),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    /**
+     * A stable id per peer. Offset well clear of the nudge notifications, which count up from
+     * [MONITORING_NOTIFICATION_ID], so the two can never land on the same id and overwrite one
+     * another.
+     */
+    private fun peerAlertNotificationId(peerId: String): Int =
+        PEER_ALERT_ID_BASE + (peerId.hashCode() and 0xFFFF)
+
     fun fireHapticPattern() {
         vibrator.vibrate(VibrationEffect.createWaveform(SOS_PATTERN_MILLIS, NO_REPEAT))
     }
@@ -136,7 +192,9 @@ class HelpCircleNotificationManager @Inject constructor(
     companion object {
         const val MONITORING_NOTIFICATION_ID = 1
         const val NUDGE_CHANNEL_ID = "nudges"
+        const val PEER_ALERT_CHANNEL_ID = "peer_alerts"
         private const val MONITORING_CHANNEL_ID = "monitoring"
+        private const val PEER_ALERT_ID_BASE = 100_000
 
         // long-short-short-long: off, on(long), off, on(short), off, on(short), off, on(long)
         private val SOS_PATTERN_MILLIS = longArrayOf(0, 400, 100, 150, 100, 150, 100, 400)

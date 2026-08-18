@@ -30,7 +30,15 @@ class PublishAgencyStatusUseCase(
     suspend operator fun invoke(state: AgencyState): Boolean {
         val status = state.toMemberStatus()
         if (publishedStatusTracker.isUnchanged(status)) return false
-        val communityId = communityRepository.getActiveCommunityId() ?: return false
+        val communityId = communityRepository.getActiveCommunityId()
+        if (communityId == null) {
+            // Nothing to tell, so record it as told. Without this the status would never settle
+            // while the user belongs to no circle, and every scroll event would repeat the lookup
+            // above — a database read on the hot detection path. Joining a circle re-marks or
+            // clears this, so a real status can never end up suppressed.
+            publishedStatusTracker.markPublished(status)
+            return false
+        }
         communityRepository.publishStatus(communityId, status)
         publishedStatusTracker.markPublished(status)
         return status == MemberStatus.CRISIS

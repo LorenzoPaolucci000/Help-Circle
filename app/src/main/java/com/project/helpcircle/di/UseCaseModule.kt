@@ -7,6 +7,7 @@ import com.project.helpcircle.domain.engine.PublishedStatusTracker
 import com.project.helpcircle.domain.engine.SystemFallbackEvaluator
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.PeerAlertRepository
 import com.project.helpcircle.domain.repository.CommunityWeeklyHistoryRepository
 import com.project.helpcircle.domain.repository.InstalledAppsRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
@@ -18,6 +19,7 @@ import com.project.helpcircle.domain.usecase.AcknowledgeRecoveryUseCase
 import com.project.helpcircle.domain.usecase.CalculateAgencyIndexUseCase
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
+import com.project.helpcircle.domain.usecase.AlertCircleUseCase
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
 import com.project.helpcircle.domain.usecase.PublishAgencyStatusUseCase
 import com.project.helpcircle.domain.usecase.EvaluateSystemFallbackUseCase
@@ -64,6 +66,12 @@ object UseCaseModule {
     fun providePublishedStatusTracker(): PublishedStatusTracker = PublishedStatusTracker()
 
     @Provides
+    fun provideAlertCircleUseCase(
+        communityRepository: CommunityRepository,
+        peerAlertRepository: PeerAlertRepository
+    ): AlertCircleUseCase = AlertCircleUseCase(communityRepository, peerAlertRepository)
+
+    @Provides
     fun providePublishAgencyStatusUseCase(
         communityRepository: CommunityRepository,
         publishedStatusTracker: PublishedStatusTracker
@@ -90,7 +98,8 @@ object UseCaseModule {
         evaluateSystemFallbackUseCase: EvaluateSystemFallbackUseCase,
         acknowledgeRecoveryUseCase: AcknowledgeRecoveryUseCase,
         communityRepository: CommunityRepository,
-        publishAgencyStatusUseCase: PublishAgencyStatusUseCase
+        publishAgencyStatusUseCase: PublishAgencyStatusUseCase,
+        alertCircleUseCase: AlertCircleUseCase
     ): DetectLossOfAgencyUseCase = DetectLossOfAgencyUseCase(
         agencyDetectionEngine,
         agencyRepository,
@@ -100,7 +109,8 @@ object UseCaseModule {
         evaluateSystemFallbackUseCase,
         acknowledgeRecoveryUseCase,
         communityRepository,
-        publishAgencyStatusUseCase
+        publishAgencyStatusUseCase,
+        alertCircleUseCase
     )
 
     @Provides

@@ -1,13 +1,16 @@
 package com.project.helpcircle.data.repository
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.messaging.FirebaseMessaging
 import com.project.helpcircle.data.local.dao.ActiveCommunityDao
 import com.project.helpcircle.data.local.entity.ActiveCommunityEntity
+import com.project.helpcircle.domain.engine.PublishedStatusTracker
 import com.project.helpcircle.domain.model.AgencyIndex
 import com.project.helpcircle.domain.model.CommunityMember
 import com.project.helpcircle.domain.model.CommunityState
@@ -52,7 +55,9 @@ class CommunityRepositoryImpl @Inject constructor(
     private val userRepository: UserRepository,
     private val agencyRepository: AgencyRepository,
     private val activeCommunityDao: ActiveCommunityDao,
-    private val communityWeeklyHistoryRepository: CommunityWeeklyHistoryRepository
+    private val communityWeeklyHistoryRepository: CommunityWeeklyHistoryRepository,
+    private val firebaseMessaging: FirebaseMessaging,
+    private val publishedStatusTracker: PublishedStatusTracker
 ) : CommunityRepository {
 
     override fun observeCommunityState(communityId: String): Flow<CommunityState> =
@@ -103,6 +108,7 @@ class CommunityRepositoryImpl @Inject constructor(
         }.await()
 
         activeCommunityDao.upsert(ActiveCommunityEntity(communityId = communityId))
+        onJoinedCommunity(communityId)
         val members = doc.collection(MEMBERS_COLLECTION).get().await().documents.map { it.toCommunityMember() }
         doc.get().await().toCommunityState(communityId, members)
     }
@@ -130,6 +136,7 @@ class CommunityRepositoryImpl @Inject constructor(
                 )
             ).await()
             activeCommunityDao.upsert(ActiveCommunityEntity(communityId = communityId))
+            onJoinedCommunity(communityId)
             // No need to re-fetch the member roster or the community doc afterward — a freshly
             // created circle has exactly one member (the caller, just written below) and the invite
             // code and name are the ones we just wrote, so all three are already known locally.
@@ -244,9 +251,53 @@ class CommunityRepositoryImpl @Inject constructor(
         }
 
         activeCommunityDao.clear()
+        unsubscribeFromAlerts(communityId)
+        // Forgotten rather than set to a value: with no circle to report to there is nothing this
+        // device has "last told" anyone, and the next reading should be free to publish afresh if
+        // another circle is joined.
+        publishedStatusTracker.reset()
+    }
+
+    override suspend fun ensureAlertSubscription() {
+        val communityId = activeCommunityDao.get()?.communityId ?: return
+        subscribeToAlerts(communityId)
     }
 
     override suspend fun getActiveCommunityId(): String? = activeCommunityDao.get()?.communityId
+
+    /**
+     * Shared tail of joining and creating: start listening for the circle's alerts, and record that
+     * the roster entry just written says OK, so the next detection reading only republishes if the
+     * user's status has genuinely moved off it.
+     */
+    private suspend fun onJoinedCommunity(communityId: String) {
+        publishedStatusTracker.markPublished(MemberStatus.OK)
+        subscribeToAlerts(communityId)
+    }
+
+    /**
+     * Subscribes to the circle's alert topic. A topic rather than per-device tokens deliberately:
+     * nothing about a member then has to be stored anywhere to reach them, which keeps the roster
+     * to the same minimal fields the privacy rule already allows.
+     *
+     * Failures are swallowed on purpose. Losing push is far less bad than failing the join that
+     * carries it, and [ensureAlertSubscription] retries on the next process start anyway.
+     */
+    private suspend fun subscribeToAlerts(communityId: String) {
+        try {
+            firebaseMessaging.subscribeToTopic(alertTopic(communityId)).await()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not subscribe to alerts for this circle", e)
+        }
+    }
+
+    private suspend fun unsubscribeFromAlerts(communityId: String) {
+        try {
+            firebaseMessaging.unsubscribeFromTopic(alertTopic(communityId)).await()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not unsubscribe from alerts for this circle", e)
+        }
+    }
 
     override suspend fun getMemberCount(communityId: String): Int = retryingOnUnauthenticated {
         communityDoc(communityId).collection(MEMBERS_COLLECTION).get().await().size()
@@ -415,5 +466,16 @@ class CommunityRepositoryImpl @Inject constructor(
 
         /** Minimum per-member agencyScore, held by every member, for the IA_comm cohesion bonus. */
         private const val COHESION_THRESHOLD = 60
+
+        private const val TAG = "CommunityRepository"
+
+        /**
+         * Prefix for a circle's alert topic. The community id is a UUID, so the resulting name is
+         * within the character set messaging topics accept.
+         */
+        private const val ALERT_TOPIC_PREFIX = "community_"
+
+        /** The messaging topic every member of [communityId] listens on. */
+        fun alertTopic(communityId: String): String = ALERT_TOPIC_PREFIX + communityId
     }
 }

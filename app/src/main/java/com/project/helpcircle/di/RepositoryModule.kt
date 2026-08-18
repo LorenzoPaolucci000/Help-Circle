@@ -5,6 +5,7 @@ import com.project.helpcircle.data.repository.CommunityRepositoryImpl
 import com.project.helpcircle.data.repository.CommunityWeeklyHistoryRepositoryImpl
 import com.project.helpcircle.data.repository.MonitoredAppsRepositoryImpl
 import com.project.helpcircle.data.repository.NudgeRepositoryImpl
+import com.project.helpcircle.data.repository.PeerAlertRepositoryImpl
 import com.project.helpcircle.data.repository.UserRepositoryImpl
 import com.project.helpcircle.data.repository.WeeklyHistoryRepositoryImpl
 import com.project.helpcircle.data.repository.WeeklySatisfactionRepositoryImpl
@@ -15,6 +16,7 @@ import com.project.helpcircle.domain.repository.InstalledAppsRepository
 import com.project.helpcircle.domain.repository.MonitoredAppsRepository
 import com.project.helpcircle.domain.repository.MonitoringStatusRepository
 import com.project.helpcircle.domain.repository.NudgeRepository
+import com.project.helpcircle.domain.repository.PeerAlertRepository
 import com.project.helpcircle.domain.repository.UserRepository
 import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
 import com.project.helpcircle.domain.repository.WeeklySatisfactionRepository
@@ -46,6 +48,9 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindNudgeRepository(impl: NudgeRepositoryImpl): NudgeRepository
+
+    @Binds
+    abstract fun bindPeerAlertRepository(impl: PeerAlertRepositoryImpl): PeerAlertRepository
 
     @Binds
     abstract fun bindMonitoredAppsRepository(impl: MonitoredAppsRepositoryImpl): MonitoredAppsRepository

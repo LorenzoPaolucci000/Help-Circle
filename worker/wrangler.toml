@@ -1,0 +1,9 @@
+name = "helpcircle-alerts"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Not a secret: this is the same project id that already ships inside the app's
+# google-services.json. The two credentials that ARE secret are set with
+# `wrangler secret put` and never appear in this file, so it is safe to commit.
+[vars]
+FIREBASE_PROJECT_ID = "help-circle-c80fa"

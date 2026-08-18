@@ -3,9 +3,15 @@ package com.project.helpcircle
 import android.app.Application
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.os.HelpCircleNotificationManager
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /** Application entry point that bootstraps the Hilt dependency graph. */
 @HiltAndroidApp
@@ -14,10 +20,20 @@ class HelpCircleApplication : Application() {
     @Inject
     lateinit var notificationManager: HelpCircleNotificationManager
 
+    @Inject
+    lateinit var communityRepository: CommunityRepository
+
+    /** Swallows failures for the same reason the accessibility service's scope does: nothing started here is worth crashing the app over. */
+    private val applicationScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, _ -> })
+
     override fun onCreate() {
         super.onCreate()
         notificationManager.createNotificationChannels()
         installFirestoreListenerCrashGuard()
+        // Process start, not app launch: this also runs when the accessibility service brings the
+        // process up on its own, so a user who never opens the app still stays reachable.
+        applicationScope.launch { communityRepository.ensureAlertSubscription() }
     }
 
     /**

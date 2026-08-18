@@ -1,0 +1,14 @@
+{
+  "name": "helpcircle-alerts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sends HelpCircle peer-crisis alerts through Firebase Cloud Messaging.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.124.0"
+  }
+}

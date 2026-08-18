@@ -58,6 +58,7 @@ private class SettingsFakeCommunityRepository(private val activeCommunityId: Str
     override suspend fun leaveCommunity(communityId: String) {
         leftCommunityId = communityId
     }
+    override suspend fun ensureAlertSubscription() = Unit
     override suspend fun getActiveCommunityId(): String? = activeCommunityId
     override suspend fun getMemberCount(communityId: String): Int = 0
 }

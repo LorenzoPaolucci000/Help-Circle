@@ -43,6 +43,7 @@ private class DashboardFakeCommunityRepository(
         satisfaction: WeeklySatisfaction
     ) = Unit
     override suspend fun leaveCommunity(communityId: String) = Unit
+    override suspend fun ensureAlertSubscription() = Unit
     override suspend fun getActiveCommunityId(): String? = activeCommunityId
     override suspend fun getMemberCount(communityId: String): Int = memberCount
 }

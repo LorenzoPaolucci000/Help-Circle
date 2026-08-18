@@ -54,6 +54,15 @@ interface CommunityRepository {
     suspend fun leaveCommunity(communityId: String)
 
     /** The community this device last joined, or null if it has never joined one. */
+    /**
+     * Re-asserts this device's subscription to its circle's alert channel, if it belongs to one.
+     * Joining already subscribes, but that subscription is tied to a messaging token which is
+     * regenerated on reinstall — and a reinstall keeps the local membership record, so no join
+     * happens to re-establish it. Called on process start, where it is a cheap no-op in the normal
+     * case.
+     */
+    suspend fun ensureAlertSubscription()
+
     suspend fun getActiveCommunityId(): String?
 
     /** How many members are currently in the given community. */

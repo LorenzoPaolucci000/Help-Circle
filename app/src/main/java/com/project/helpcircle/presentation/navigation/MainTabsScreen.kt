@@ -40,12 +40,14 @@ import com.project.helpcircle.ui.theme.Spacing
  * (saveState/restoreState + launchSingleTop against the graph's start destination) so each tab
  * keeps its own state when the user switches away and back, rather than resetting on every tap.
  * Starts on the Community tab, since that's the screen a returning or freshly-onboarded user
- * expects to land on.
+ * expects to land on, unless [initialTab] says otherwise — a notification about a peer in crisis
+ * opens the Help tab, where the reader can actually respond.
  */
 @Composable
 fun MainTabsScreen(
     onLeftCommunity: () -> Unit,
     modifier: Modifier = Modifier,
+    initialTab: TabDestination = TabDestination.COMMUNITY,
     monitoringStatusViewModel: MonitoringStatusViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
@@ -118,7 +120,10 @@ fun MainTabsScreen(
             }
             NavHost(
                 navController = navController,
-                startDestination = TabDestination.COMMUNITY.route
+                // The start destination rather than a navigate() call, so arriving from a peer
+                // alert opens straight onto the Help tab with nothing stacked behind it to go back
+                // through.
+                startDestination = initialTab.route
             ) {
                 composable(TabDestination.ME.route) {
                     HomeScreen()

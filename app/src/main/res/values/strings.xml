@@ -13,6 +13,14 @@
     <string name="haptic_nudge_title">Your circle reached out</string>
     <string name="haptic_nudge_text">Someone sent you a haptic nudge.</string>
     <string name="recovery_action_label">I\'m back</string>
+
+    <!-- Peer crisis alerts. Kept on their own channel so a user can silence these without also
+         silencing the interventions people send them, which are a different kind of interruption. -->
+    <string name="peer_alert_channel_name">A peer needs support</string>
+    <string name="peer_alert_channel_description">Alerts you when someone in your circle is struggling.</string>
+    <string name="peer_crisis_title">%1$s needs support</string>
+    <string name="peer_crisis_text">They\'re caught in a scroll right now. Tap to send them something.</string>
+    <string name="peer_crisis_unknown_nickname">Someone in your circle</string>
     <string name="grayscale_nudge_title">Your circle reached out</string>
     <string name="grayscale_nudge_text">Someone sent you a grey-scale nudge, but this device can\'t dim the screen right now.</string>
     <string name="content_blur_nudge_title">Your circle reached out</string>

@@ -96,6 +96,7 @@ private class HomeViewModelFakeCommunityRepository(
     }
 
     override suspend fun leaveCommunity(communityId: String) = Unit
+    override suspend fun ensureAlertSubscription() = Unit
     override suspend fun getActiveCommunityId(): String? = activeCommunityId
     override suspend fun getMemberCount(communityId: String): Int = 0
 }

@@ -16,6 +16,7 @@ import com.project.helpcircle.domain.model.WeeklySummary
 import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
+import com.project.helpcircle.domain.repository.PeerAlertRepository
 import com.project.helpcircle.domain.repository.WeeklyHistoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,8 +103,17 @@ private class DetectLossFakeCommunityRepository(
         satisfaction: WeeklySatisfaction
     ) = Unit
     override suspend fun leaveCommunity(communityId: String) = Unit
+    override suspend fun ensureAlertSubscription() = Unit
     override suspend fun getActiveCommunityId(): String? = activeCommunityId
     override suspend fun getMemberCount(communityId: String): Int = memberCount
+}
+
+/** Records which circles were alerted, so tests can pin that a crisis alerts once rather than per scroll. */
+private class DetectLossFakePeerAlertRepository : PeerAlertRepository {
+    val alertedCommunityIds = mutableListOf<String>()
+    override suspend fun alertCircle(communityId: String) {
+        alertedCommunityIds += communityId
+    }
 }
 
 private fun useCase(
@@ -111,7 +121,8 @@ private fun useCase(
     agencyRepository: DetectLossFakeAgencyRepository,
     weeklyHistoryRepository: DetectLossFakeWeeklyHistoryRepository,
     tracker: CrisisEpisodeTracker = CrisisEpisodeTracker(),
-    communityRepository: CommunityRepository = DetectLossFakeCommunityRepository(activeCommunityId = "comm-1", memberCount = 2)
+    communityRepository: CommunityRepository = DetectLossFakeCommunityRepository(activeCommunityId = "comm-1", memberCount = 2),
+    peerAlertRepository: PeerAlertRepository = DetectLossFakePeerAlertRepository()
 ): DetectLossOfAgencyUseCase {
     val calculateAgencyIndexUseCase = CalculateAgencyIndexUseCase(agencyRepository)
     return DetectLossOfAgencyUseCase(
@@ -123,11 +134,59 @@ private fun useCase(
         EvaluateSystemFallbackUseCase(tracker, SystemFallbackEvaluator(tracker), communityRepository),
         AcknowledgeRecoveryUseCase(agencyRepository, tracker, calculateAgencyIndexUseCase, weeklyHistoryRepository),
         communityRepository,
-        PublishAgencyStatusUseCase(communityRepository, PublishedStatusTracker())
+        PublishAgencyStatusUseCase(communityRepository, PublishedStatusTracker()),
+        AlertCircleUseCase(communityRepository, peerAlertRepository)
     )
 }
 
 class DetectLossOfAgencyUseCaseTest {
+
+    /**
+     * Detection re-evaluates on every scroll event, so the circle must hear about a crisis once,
+     * not once per scroll. Ten readings of the same state is the shape a real doomscroll session
+     * takes, and it has to produce exactly one write and one alert.
+     */
+    @Test
+    fun `a sustained crisis publishes once and alerts peers once`() = runBlocking {
+        val agencyRepository = DetectLossFakeAgencyRepository()
+        val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
+        val communityRepository = DetectLossFakeCommunityRepository(activeCommunityId = "comm-1", memberCount = 2)
+        val peerAlertRepository = DetectLossFakePeerAlertRepository()
+        val engine = AgencyDetectionEngine(scrollThreshold = 1, warningRatio = 0.6)
+        val detect = useCase(
+            engine,
+            agencyRepository,
+            weeklyHistoryRepository,
+            communityRepository = communityRepository,
+            peerAlertRepository = peerAlertRepository
+        )
+
+        repeat(10) { detect(ScrollSignal(it * 100L)) }
+
+        assertEquals(listOf(MemberStatus.CRISIS), communityRepository.publishedStatuses)
+        assertEquals(listOf("comm-1"), peerAlertRepository.alertedCommunityIds)
+    }
+
+    @Test
+    fun `staying stable shares ok and never alerts anyone`() = runBlocking {
+        val agencyRepository = DetectLossFakeAgencyRepository()
+        val weeklyHistoryRepository = DetectLossFakeWeeklyHistoryRepository()
+        val communityRepository = DetectLossFakeCommunityRepository(activeCommunityId = "comm-1", memberCount = 2)
+        val peerAlertRepository = DetectLossFakePeerAlertRepository()
+        val engine = AgencyDetectionEngine(scrollThreshold = 100, warningRatio = 0.6)
+        val detect = useCase(
+            engine,
+            agencyRepository,
+            weeklyHistoryRepository,
+            communityRepository = communityRepository,
+            peerAlertRepository = peerAlertRepository
+        )
+
+        repeat(5) { detect(ScrollSignal(it * 100L)) }
+
+        assertEquals(listOf(MemberStatus.OK), communityRepository.publishedStatuses)
+        assertTrue(peerAlertRepository.alertedCommunityIds.isEmpty())
+    }
 
     @Test
     fun `staying stable reports Stable and earns no delta`() = runBlocking {
