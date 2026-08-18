@@ -166,6 +166,28 @@ class CommunityRepositoryImpl @Inject constructor(
         writeOwnMemberDoc(communityId, MemberStatus.OK)
     }
 
+    /**
+     * Writes only the tier and the derived score, as a merge of those two fields alone, so it can't
+     * clobber the nickname the join path owns. Runs on every tier change during a scroll session,
+     * which is why it deliberately does *not* also append an event the way [reportCrisis] does —
+     * one document write per transition, nothing more.
+     */
+    override suspend fun publishStatus(communityId: String, status: MemberStatus): Unit =
+        retryingOnUnauthenticated {
+            val identity = userRepository.getOrCreateIdentity()
+            val agencyScore = agencyRepository.currentAgencyIndex.first().value
+            communityDoc(communityId).collection(MEMBERS_COLLECTION).document(identity.anonymousHash)
+                .set(
+                    mapOf(
+                        FIELD_STATUS to status.toFirestoreValue(),
+                        FIELD_AGENCY_SCORE to agencyScore,
+                        FIELD_LAST_SEEN to FieldValue.serverTimestamp()
+                    ),
+                    SetOptions.merge()
+                )
+                .await()
+        }
+
     override suspend fun publishSatisfaction(
         communityId: String,
         weekStartEpochMillis: Long,

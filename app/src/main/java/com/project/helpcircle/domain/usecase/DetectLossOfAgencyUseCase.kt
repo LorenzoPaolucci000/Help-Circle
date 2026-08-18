@@ -23,7 +23,9 @@ data class LossOfAgencyResult(
  * Whenever the tracker reports a closed episode, it's archived to [WeeklyHistoryRepository] for the
  * weekly summary's peak-crisis-hours/intervention-category stats. Also asks
  * [EvaluateSystemFallbackUseCase] whether the community is offline or unresponsive enough that the
- * system should autonomously offer its own break prompt, per the crisis-fallback spec.
+ * system should autonomously offer its own break prompt, per the crisis-fallback spec. Finally,
+ * hands the reading to [PublishAgencyStatusUseCase] so the circle sees the user's coarse status
+ * change — the only step here that leaves the device, which is why it runs last.
  *
  * Before any of that, resolves any System Fallback break the user committed to via
  * [StartSystemFallbackBreakUseCase]: this is the single choke point every scroll signal already
@@ -41,7 +43,8 @@ class DetectLossOfAgencyUseCase(
     private val weeklyHistoryRepository: WeeklyHistoryRepository,
     private val evaluateSystemFallbackUseCase: EvaluateSystemFallbackUseCase,
     private val acknowledgeRecoveryUseCase: AcknowledgeRecoveryUseCase,
-    private val communityRepository: CommunityRepository
+    private val communityRepository: CommunityRepository,
+    private val publishAgencyStatusUseCase: PublishAgencyStatusUseCase
 ) {
     suspend operator fun invoke(signal: ScrollSignal): LossOfAgencyResult {
         resolvePendingBreak(signal.timestampMillis)
@@ -57,6 +60,11 @@ class DetectLossOfAgencyUseCase(
             )
         }
         val offerSystemFallback = evaluateSystemFallbackUseCase(state, signal.timestampMillis)
+        // Last, and deliberately so: this is the only step here that touches the network, and
+        // everything above it is local scoring that must still happen when the circle is
+        // unreachable. Publishing earlier would let a Firestore failure skip the episode
+        // bookkeeping and the fallback decision entirely.
+        publishAgencyStatusUseCase(state)
         return LossOfAgencyResult(state, offerSystemFallback)
     }
 

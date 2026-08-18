@@ -25,6 +25,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.project.helpcircle.presentation.common.MonitoringDisabledBanner
 import com.project.helpcircle.presentation.common.MonitoringStatusViewModel
+import com.project.helpcircle.presentation.common.NotificationsDisabledBanner
+import com.project.helpcircle.presentation.common.RequestNotificationPermissionOnce
+import com.project.helpcircle.presentation.common.rememberNotificationsEnabled
 import com.project.helpcircle.presentation.community.CommunityDashboardScreen
 import com.project.helpcircle.presentation.help.HelpScreen
 import com.project.helpcircle.presentation.home.HomeScreen
@@ -47,7 +50,12 @@ fun MainTabsScreen(
 ) {
     val navController = rememberNavController()
     val isMonitoringActive by monitoringStatusViewModel.isMonitoringActive.collectAsState()
+    val areNotificationsEnabled = rememberNotificationsEnabled()
     val context = LocalContext.current
+
+    // Asked here rather than during onboarding so that installs which predate this also get the
+    // prompt; the system shows its dialog at most once regardless of how often this runs.
+    RequestNotificationPermissionOnce()
 
     Scaffold(
         modifier = modifier,
@@ -87,6 +95,21 @@ fun MainTabsScreen(
                 MonitoringDisabledBanner(
                     onTurnBackOnClicked = {
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.screenHorizontal, vertical = Spacing.sm)
+                )
+            } else if (!areNotificationsEnabled) {
+                // Deliberately one banner at a time rather than both stacked: two red cards push
+                // the actual content off screen, and monitoring being off is the more urgent of
+                // the two, so this one surfaces once that is resolved.
+                NotificationsDisabledBanner(
+                    onEnableClicked = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        )
                     },
                     modifier = Modifier
                         .fillMaxWidth()

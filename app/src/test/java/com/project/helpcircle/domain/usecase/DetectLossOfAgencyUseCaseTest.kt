@@ -3,6 +3,7 @@ package com.project.helpcircle.domain.usecase
 import com.project.helpcircle.domain.engine.AgencyDetectionEngine
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.engine.DetectionConfig
+import com.project.helpcircle.domain.engine.PublishedStatusTracker
 import com.project.helpcircle.domain.engine.ScrollSignal
 import com.project.helpcircle.domain.engine.SystemFallbackEvaluator
 import com.project.helpcircle.domain.model.AgencyIndex
@@ -10,6 +11,7 @@ import com.project.helpcircle.domain.model.AgencyState
 import com.project.helpcircle.domain.model.CommunityState
 import com.project.helpcircle.domain.model.CrisisEpisodeRecord
 import com.project.helpcircle.domain.model.FocusSession
+import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.WeeklySummary
 import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.AgencyRepository
@@ -87,6 +89,12 @@ private class DetectLossFakeCommunityRepository(
     override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState = throw UnsupportedOperationException()
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
+
+    /** Recorded so tests can assert the status is shared once per transition, not once per scroll. */
+    val publishedStatuses = mutableListOf<MemberStatus>()
+    override suspend fun publishStatus(communityId: String, status: MemberStatus) {
+        publishedStatuses += status
+    }
     override suspend fun reportRecovery(communityId: String) = Unit
     override suspend fun publishSatisfaction(
         communityId: String,
@@ -114,7 +122,8 @@ private fun useCase(
         weeklyHistoryRepository,
         EvaluateSystemFallbackUseCase(tracker, SystemFallbackEvaluator(tracker), communityRepository),
         AcknowledgeRecoveryUseCase(agencyRepository, tracker, calculateAgencyIndexUseCase, weeklyHistoryRepository),
-        communityRepository
+        communityRepository,
+        PublishAgencyStatusUseCase(communityRepository, PublishedStatusTracker())
     )
 }
 

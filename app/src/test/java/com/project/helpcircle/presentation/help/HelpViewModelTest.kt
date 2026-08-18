@@ -49,6 +49,7 @@ private class HelpFakeCommunityRepository(
     override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState = throw UnsupportedOperationException()
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
+    override suspend fun publishStatus(communityId: String, status: MemberStatus) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
     override suspend fun publishSatisfaction(
         communityId: String,

@@ -5,6 +5,7 @@ import com.project.helpcircle.domain.model.AgencyState
 import com.project.helpcircle.domain.model.CrisisEpisodeRecord
 import com.project.helpcircle.domain.model.FocusSession
 import com.project.helpcircle.domain.model.CommunityState
+import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.model.WeeklySummary
 import com.project.helpcircle.domain.repository.AgencyRepository
@@ -82,6 +83,7 @@ private class HomeViewModelFakeCommunityRepository(
 
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
+    override suspend fun publishStatus(communityId: String, status: MemberStatus) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
 
     override suspend fun publishSatisfaction(

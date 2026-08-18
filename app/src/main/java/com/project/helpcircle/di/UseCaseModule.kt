@@ -3,6 +3,7 @@ package com.project.helpcircle.di
 import com.project.helpcircle.domain.engine.AgencyDetectionEngine
 import com.project.helpcircle.domain.engine.CrisisEpisodeTracker
 import com.project.helpcircle.domain.engine.ForegroundAppTracker
+import com.project.helpcircle.domain.engine.PublishedStatusTracker
 import com.project.helpcircle.domain.engine.SystemFallbackEvaluator
 import com.project.helpcircle.domain.repository.AgencyRepository
 import com.project.helpcircle.domain.repository.CommunityRepository
@@ -18,6 +19,7 @@ import com.project.helpcircle.domain.usecase.CalculateAgencyIndexUseCase
 import com.project.helpcircle.domain.usecase.ConsumeChargeUseCase
 import com.project.helpcircle.domain.usecase.CreateCommunityUseCase
 import com.project.helpcircle.domain.usecase.DetectLossOfAgencyUseCase
+import com.project.helpcircle.domain.usecase.PublishAgencyStatusUseCase
 import com.project.helpcircle.domain.usecase.EvaluateSystemFallbackUseCase
 import com.project.helpcircle.domain.usecase.GetInstalledAppsUseCase
 import com.project.helpcircle.domain.usecase.IsFocusModeActiveUseCase
@@ -59,6 +61,16 @@ object UseCaseModule {
 
     @Provides
     @Singleton
+    fun providePublishedStatusTracker(): PublishedStatusTracker = PublishedStatusTracker()
+
+    @Provides
+    fun providePublishAgencyStatusUseCase(
+        communityRepository: CommunityRepository,
+        publishedStatusTracker: PublishedStatusTracker
+    ): PublishAgencyStatusUseCase = PublishAgencyStatusUseCase(communityRepository, publishedStatusTracker)
+
+    @Provides
+    @Singleton
     fun provideSystemFallbackEvaluator(
         crisisEpisodeTracker: CrisisEpisodeTracker
     ): SystemFallbackEvaluator = SystemFallbackEvaluator(crisisEpisodeTracker)
@@ -77,7 +89,8 @@ object UseCaseModule {
         weeklyHistoryRepository: WeeklyHistoryRepository,
         evaluateSystemFallbackUseCase: EvaluateSystemFallbackUseCase,
         acknowledgeRecoveryUseCase: AcknowledgeRecoveryUseCase,
-        communityRepository: CommunityRepository
+        communityRepository: CommunityRepository,
+        publishAgencyStatusUseCase: PublishAgencyStatusUseCase
     ): DetectLossOfAgencyUseCase = DetectLossOfAgencyUseCase(
         agencyDetectionEngine,
         agencyRepository,
@@ -86,7 +99,8 @@ object UseCaseModule {
         weeklyHistoryRepository,
         evaluateSystemFallbackUseCase,
         acknowledgeRecoveryUseCase,
-        communityRepository
+        communityRepository,
+        publishAgencyStatusUseCase
     )
 
     @Provides

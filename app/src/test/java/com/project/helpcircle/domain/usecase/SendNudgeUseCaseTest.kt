@@ -3,6 +3,7 @@ package com.project.helpcircle.domain.usecase
 import com.project.helpcircle.domain.engine.ForegroundAppTracker
 import com.project.helpcircle.domain.model.ChargeWallet
 import com.project.helpcircle.domain.model.CommunityState
+import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.Nudge
 import com.project.helpcircle.domain.model.UserIdentity
 import com.project.helpcircle.domain.model.WeeklySatisfaction
@@ -40,6 +41,7 @@ private class SendNudgeFakeCommunityRepository(private val memberCount: Int) : C
         throw UnsupportedOperationException()
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
+    override suspend fun publishStatus(communityId: String, status: MemberStatus) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
     override suspend fun publishSatisfaction(
         communityId: String,

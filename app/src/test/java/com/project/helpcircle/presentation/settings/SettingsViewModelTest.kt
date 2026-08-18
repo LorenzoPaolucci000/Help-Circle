@@ -3,6 +3,7 @@ package com.project.helpcircle.presentation.settings
 import com.project.helpcircle.domain.model.AppCategory
 import com.project.helpcircle.domain.model.AppInfo
 import com.project.helpcircle.domain.model.CommunityState
+import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.WeeklySatisfaction
 import com.project.helpcircle.domain.repository.CommunityRepository
 import com.project.helpcircle.domain.repository.InstalledAppsRepository
@@ -47,6 +48,7 @@ private class SettingsFakeCommunityRepository(private val activeCommunityId: Str
     override suspend fun createCommunity(communityId: String, inviteCode: String, name: String): CommunityState = throw UnsupportedOperationException()
     override suspend fun joinCommunityByInviteCode(inviteCode: String): CommunityState? = null
     override suspend fun reportCrisis(communityId: String) = Unit
+    override suspend fun publishStatus(communityId: String, status: MemberStatus) = Unit
     override suspend fun reportRecovery(communityId: String) = Unit
     override suspend fun publishSatisfaction(
         communityId: String,

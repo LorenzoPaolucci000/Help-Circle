@@ -1,6 +1,7 @@
 package com.project.helpcircle.domain.repository
 
 import com.project.helpcircle.domain.model.CommunityState
+import com.project.helpcircle.domain.model.MemberStatus
 import com.project.helpcircle.domain.model.WeeklySatisfaction
 import kotlinx.coroutines.flow.Flow
 
@@ -28,6 +29,14 @@ interface CommunityRepository {
 
     suspend fun reportCrisis(communityId: String)
     suspend fun reportRecovery(communityId: String)
+
+    /**
+     * Shares this device's coarse [MemberStatus] with its circle. Distinct from [reportCrisis] and
+     * [reportRecovery], which mark episode milestones and also append an event: this is the
+     * continuous tier signal the roster and the Help tab's peer list are built from, written on
+     * every change of tier including the intermediate at-risk one that neither of those covers.
+     */
+    suspend fun publishStatus(communityId: String, status: MemberStatus)
 
     /**
      * Publishes this device's own self-reported satisfaction rating for the week starting at
