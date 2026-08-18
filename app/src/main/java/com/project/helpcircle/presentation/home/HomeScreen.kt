@@ -126,7 +126,7 @@ private fun PersonalIndexCard(
         ) {
             IndexRing(value = currentAgencyIndex)
             Text(
-                text = "IA_ind measures how intentionally you use your phone — your choices, not " +
+                text = "IA_ind measures how intentionally you use your phone, your choices, not " +
                     "just your habits. It starts at 50 and resets every week.",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
@@ -195,7 +195,7 @@ private fun WeeklySatisfactionCard(
         modifier = modifier,
         title = "How is this week going?",
         subtitle = if (selected == null) {
-            "Your circle sees the shared mood — never what caused it."
+            "Your circle sees the shared mood, never what caused it."
         } else {
             "Shared with your circle. Tap another face to change it."
         }

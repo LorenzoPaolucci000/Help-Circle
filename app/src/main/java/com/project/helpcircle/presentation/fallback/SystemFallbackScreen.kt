@@ -123,7 +123,7 @@ private fun SystemFallbackContent(
                 Spacer(modifier = Modifier.height(Spacing.xl))
                 PrimaryButton(text = "Take a 2-minute break", onClick = onTakeBreakClicked)
                 Spacer(modifier = Modifier.height(Spacing.sm))
-                SecondaryButton(text = "I'm in control — continue", onClick = onContinueClicked)
+                SecondaryButton(text = "I'm in control, continue", onClick = onContinueClicked)
             }
         }
     }

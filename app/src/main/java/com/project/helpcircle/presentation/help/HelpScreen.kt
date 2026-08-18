@@ -181,7 +181,7 @@ private fun ChargeWalletCard(availableCharges: Int, maxCharges: Int, modifier: M
         )
         Spacer(modifier = Modifier.height(Spacing.md))
         Text(
-            text = "They refill on their own — faster while you're off your monitored apps, and " +
+            text = "They refill on their own, faster while you're off your monitored apps, and " +
                 "back to full every night.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
@@ -224,7 +224,7 @@ private fun PeersNeedingHelpCard(
 
             peers.isEmpty() -> EmptyState(
                 title = "Everyone is doing okay right now",
-                detail = "Nothing to do — your circle will appear here the moment someone starts slipping."
+                detail = "Nothing to do, your circle will appear here the moment someone starts slipping."
             )
 
             // Ordering comes from the domain (crisis before at-risk), so nothing here re-sorts.

@@ -10,8 +10,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import com.project.helpcircle.ui.theme.Shapes
 import com.project.helpcircle.ui.theme.Spacing
+
+/**
+ * Inset of a button's label from the pill's own edge. Specifying the horizontal value matters: a
+ * `PaddingValues(vertical = …)` leaves the horizontal padding at zero, which puts the first glyph
+ * of a long label underneath the pill's rounded corner and left it looking clipped.
+ */
+private val ButtonContentPadding = PaddingValues(horizontal = Spacing.xxl, vertical = Spacing.lg)
 
 /**
  * The full-width pill button that commits a screen's main action.
@@ -32,7 +40,7 @@ fun PrimaryButton(
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         shape = Shapes.pill,
-        contentPadding = PaddingValues(vertical = Spacing.lg),
+        contentPadding = ButtonContentPadding,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -40,7 +48,11 @@ fun PrimaryButton(
             disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
         )
     ) {
-        Text(text = text, style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -57,9 +69,13 @@ fun SecondaryButton(
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         shape = Shapes.pill,
-        contentPadding = PaddingValues(vertical = Spacing.lg)
+        contentPadding = ButtonContentPadding
     ) {
-        Text(text = text, style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -79,9 +95,13 @@ fun DestructiveButton(
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         shape = Shapes.pill,
-        contentPadding = PaddingValues(vertical = Spacing.md),
+        contentPadding = PaddingValues(horizontal = Spacing.xxl, vertical = Spacing.md),
         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
     ) {
-        Text(text = text, style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.Center
+        )
     }
 }

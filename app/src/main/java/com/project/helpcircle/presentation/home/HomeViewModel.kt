@@ -87,7 +87,7 @@ class HomeViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                "Couldn't share this with your circle — tap to try again"
+                "Couldn't share this with your circle, tap to try again"
             }
             _uiState.update { it.copy(isSubmittingSatisfaction = false, satisfactionError = error) }
         }
