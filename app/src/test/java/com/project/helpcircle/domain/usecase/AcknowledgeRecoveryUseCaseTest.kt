@@ -52,8 +52,15 @@ private class AcknowledgeRecoveryFakeWeeklyHistoryRepository : WeeklyHistoryRepo
     override suspend fun recordCrisisEpisode(record: CrisisEpisodeRecord) {
         recordedEpisodes += record
     }
-    override suspend fun getCrisisEpisodesSince(sinceEpochMillis: Long): List<CrisisEpisodeRecord> =
-        recordedEpisodes.filter { it.startedAtEpochMillis >= sinceEpochMillis }
+    override suspend fun getCrisisEpisodesBetween(
+        fromEpochMillis: Long,
+        untilEpochMillis: Long
+    ): List<CrisisEpisodeRecord> = recordedEpisodes.filter {
+        it.startedAtEpochMillis >= fromEpochMillis && it.startedAtEpochMillis < untilEpochMillis
+    }
+    override suspend fun deleteCrisisEpisodesBefore(beforeEpochMillis: Long) {
+        recordedEpisodes.removeAll { it.startedAtEpochMillis < beforeEpochMillis }
+    }
     override suspend fun saveWeeklySummary(summary: WeeklySummary) {
         summariesFlow.update { it + summary }
     }

@@ -35,7 +35,8 @@ private class HomeFakeAgencyRepository(initialIndex: AgencyIndex) : AgencyReposi
 private class HomeFakeWeeklyHistoryRepository(initialSummaries: List<WeeklySummary>) : WeeklyHistoryRepository {
     private val summariesFlow = MutableStateFlow(initialSummaries)
     override suspend fun recordCrisisEpisode(record: CrisisEpisodeRecord) = Unit
-    override suspend fun getCrisisEpisodesSince(sinceEpochMillis: Long): List<CrisisEpisodeRecord> = emptyList()
+    override suspend fun getCrisisEpisodesBetween(fromEpochMillis: Long, untilEpochMillis: Long): List<CrisisEpisodeRecord> = emptyList()
+    override suspend fun deleteCrisisEpisodesBefore(beforeEpochMillis: Long) = Unit
     override suspend fun saveWeeklySummary(summary: WeeklySummary) {
         summariesFlow.value = summariesFlow.value + summary
     }

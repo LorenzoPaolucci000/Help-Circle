@@ -25,10 +25,17 @@ class WeeklyHistoryRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun getCrisisEpisodesSince(sinceEpochMillis: Long): List<CrisisEpisodeRecord> =
-        weeklyHistoryDao.getCrisisEpisodesSince(sinceEpochMillis).map {
+    override suspend fun getCrisisEpisodesBetween(
+        fromEpochMillis: Long,
+        untilEpochMillis: Long
+    ): List<CrisisEpisodeRecord> =
+        weeklyHistoryDao.getCrisisEpisodesBetween(fromEpochMillis, untilEpochMillis).map {
             CrisisEpisodeRecord(it.startedAtEpochMillis, it.nudgeCategory, it.wasEffectiveIntervention)
         }
+
+    override suspend fun deleteCrisisEpisodesBefore(beforeEpochMillis: Long) {
+        weeklyHistoryDao.deleteCrisisEpisodesBefore(beforeEpochMillis)
+    }
 
     override suspend fun saveWeeklySummary(summary: WeeklySummary) {
         weeklyHistoryDao.insertWeeklySummary(

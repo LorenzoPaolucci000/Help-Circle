@@ -14,7 +14,6 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
@@ -53,17 +52,26 @@ class AgencyRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateAgencyIndex(index: AgencyIndex) {
-        val current = agencyStateDao.observe().firstOrNull()
+        val current = agencyStateDao.get()
         agencyStateDao.upsert(current.withDefaults().copy(agencyIndexValue = index.value))
     }
 
+    /**
+     * Called for every scroll event the accessibility service forwards, so it deliberately writes
+     * nothing when the state is unchanged — which is the overwhelmingly common case, since a run of
+     * scrolls reports Stable (or Crisis) over and over before it ever transitions. Persisting an
+     * identical row on each one would mean an encrypted write and a Room invalidation per scroll,
+     * for no observable change, against the battery-drain constraint this service is held to.
+     */
     override suspend fun reportAgencyState(state: AgencyState) {
-        val current = agencyStateDao.observe().firstOrNull()
-        agencyStateDao.upsert(current.withDefaults().copy(agencyState = state.toStorageName()))
+        val storageName = state.toStorageName()
+        val current = agencyStateDao.get()
+        if (current?.agencyState == storageName) return
+        agencyStateDao.upsert(current.withDefaults().copy(agencyState = storageName))
     }
 
     override suspend fun adjustAgencyDeltas(deltaAutonomy: Int, deltaSupport: Int): AgencyIndex {
-        val current = agencyStateDao.observe().firstOrNull()
+        val current = agencyStateDao.get()
         val newDeltaAutonomy = (current?.deltaAutonomy ?: 0) + deltaAutonomy
         val newDeltaSupport = (current?.deltaSupport ?: 0) + deltaSupport
         val index = AgencyIndex.calculate(newDeltaAutonomy, newDeltaSupport)
@@ -78,18 +86,18 @@ class AgencyRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getLastArchivedAgencyIndex(): Int? =
-        agencyStateDao.observe().firstOrNull()?.lastArchivedAgencyIndexValue
+        agencyStateDao.get()?.lastArchivedAgencyIndexValue
 
     override suspend fun archiveAgencyIndex(agencyIndexValue: Int) {
-        val current = agencyStateDao.observe().firstOrNull()
+        val current = agencyStateDao.get()
         agencyStateDao.upsert(current.withDefaults().copy(lastArchivedAgencyIndexValue = agencyIndexValue))
     }
 
     override suspend fun getLastWeeklyResetAtEpochMillis(): Long? =
-        agencyStateDao.observe().firstOrNull()?.lastWeeklyResetAtEpochMillis
+        agencyStateDao.get()?.lastWeeklyResetAtEpochMillis
 
     override suspend fun resetAgencyIndexForNewWeek(atEpochMillis: Long) {
-        val current = agencyStateDao.observe().firstOrNull()
+        val current = agencyStateDao.get()
         agencyStateDao.upsert(
             current.withDefaults().copy(
                 agencyIndexValue = AgencyIndex.BASELINE,
@@ -111,9 +119,11 @@ class AgencyRepositoryImpl @Inject constructor(
         val lastReset = getLastWeeklyResetAtEpochMillis()
         if (lastReset != null && lastReset >= boundaryMillis) return
 
-        val currentIndexValue = agencyStateDao.observe().firstOrNull()?.agencyIndexValue ?: AgencyIndex.BASELINE
+        val currentIndexValue = agencyStateDao.get()?.agencyIndexValue ?: AgencyIndex.BASELINE
         val weekStartMillis = boundaryMillis - WeeklyResetCalculator.WEEK_DURATION_MILLIS
-        val episodes = weeklyHistoryRepository.getCrisisEpisodesSince(weekStartMillis)
+        // Same half-open range the prune below deletes, so the episodes folded into this summary and
+        // the episodes discarded afterwards are by construction the same set.
+        val episodes = weeklyHistoryRepository.getCrisisEpisodesBetween(weekStartMillis, boundaryMillis)
         val previousArchived = getLastArchivedAgencyIndex()
         val delta = currentIndexValue - (previousArchived ?: AgencyIndex.BASELINE)
 
@@ -122,6 +132,14 @@ class AgencyRepositoryImpl @Inject constructor(
         )
         archiveAgencyIndex(currentIndexValue)
         resetAgencyIndexForNewWeek(boundaryMillis)
+
+        // Deliberately last, after resetAgencyIndexForNewWeek() has committed the marker that makes
+        // this whole method a no-op until the next boundary. Dying between the two would otherwise
+        // leave the summary saved but the marker unwritten, so the next run would rebuild that same
+        // week from episodes this line had already deleted and overwrite a good summary with an
+        // empty one. In this order a crash merely leaves the old rows in place, and the following
+        // week's prune — which deletes everything before a later boundary — clears them anyway.
+        weeklyHistoryRepository.deleteCrisisEpisodesBefore(boundaryMillis)
     }
 }
 
